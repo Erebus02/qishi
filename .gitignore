@@ -1,0 +1,19 @@
+node_modules/
+.next/
+dist/
+.env
+.env.*
+.DS_Store
+
+# Flutter / Dart
+.dart_tool/
+.packages
+build/
+coverage/
+*.iml
+.idea/
+.vscode/
+
+# OS
+Thumbs.db
+Desktop.ini
