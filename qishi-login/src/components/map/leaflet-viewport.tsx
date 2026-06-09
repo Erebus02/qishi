@@ -63,6 +63,7 @@ export function LeafletViewport({
   const mapRef = useRef<L.Map | null>(null);
   const fgRef = useRef<L.FeatureGroup | null>(null);
   const [mapReady, setMapReady] = useState(false);
+  const [tilesUnavailable, setTilesUnavailable] = useState(false);
 
   const redraw = useCallback(() => {
     const map = mapRef.current;
@@ -131,11 +132,26 @@ export function LeafletViewport({
       boxZoom: false,
       keyboard: false,
     }).setView([center.lat, center.lng], zoom);
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    const tiles = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 19,
+      keepBuffer: 1,
+      updateWhenIdle: true,
+      updateWhenZooming: false,
       attribution:
         '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-    }).addTo(map);
+    });
+    let firstTileLoaded = false;
+    const tileTimeout = window.setTimeout(() => {
+      if (firstTileLoaded) return;
+      setTilesUnavailable(true);
+      tiles.removeFrom(map);
+    }, 3500);
+    tiles.on("tileload", () => {
+      firstTileLoaded = true;
+      setTilesUnavailable(false);
+      window.clearTimeout(tileTimeout);
+    });
+    tiles.addTo(map);
 
     const fg = L.featureGroup().addTo(map);
     mapRef.current = map;
@@ -149,6 +165,7 @@ export function LeafletViewport({
 
     return () => {
       window.clearTimeout(t);
+      window.clearTimeout(tileTimeout);
       window.removeEventListener("resize", onResize);
       window.removeEventListener("orientationchange", onResize);
       setMapReady(false);
@@ -188,5 +205,27 @@ export function LeafletViewport({
     };
   }, [mapReady, redraw]);
 
-  return <div ref={elRef} className={className ?? "h-full w-full"} />;
+  return (
+    <div className="relative h-full w-full overflow-hidden bg-[#dbe9f3]">
+      <div
+        className="pointer-events-none absolute inset-0"
+        aria-hidden
+        style={{
+          backgroundImage:
+            "linear-gradient(rgba(75,120,150,.12) 1px, transparent 1px), linear-gradient(90deg, rgba(75,120,150,.12) 1px, transparent 1px), radial-gradient(circle at 28% 35%, rgba(116,180,132,.35), transparent 28%), radial-gradient(circle at 72% 68%, rgba(103,169,213,.32), transparent 30%)",
+          backgroundSize: "32px 32px, 32px 32px, 100% 100%, 100% 100%",
+        }}
+      />
+      <div
+        ref={elRef}
+        className={className ?? "h-full w-full"}
+        style={{ background: "transparent" }}
+      />
+      {tilesUnavailable ? (
+        <div className="pointer-events-none absolute bottom-3 left-1/2 z-[900] -translate-x-1/2 rounded-full bg-white/90 px-3 py-1.5 text-[11px] text-slate-600 shadow-md backdrop-blur">
+          网络较慢，已切换轻量地图
+        </div>
+      ) : null}
+    </div>
+  );
 }

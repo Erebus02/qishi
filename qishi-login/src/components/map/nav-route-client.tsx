@@ -69,18 +69,16 @@ export function NavRouteClient({
 
   const compute = useCallback(async () => {
     if (!spot) return;
-    setRoute({ phase: "loading" });
     const origin = position ?? DEFAULT_MAP_CENTER;
-    const osrm = await fetchDrivingRoute(origin, destination);
-    if (osrm && osrm.length >= 2) {
-      setRoute({ phase: "ready", points: osrm, source: "osrm" });
-      return;
-    }
     setRoute({
       phase: "ready",
       points: straightLineRoute(origin, destination),
       source: "straight",
     });
+    const osrm = await fetchDrivingRoute(origin, destination);
+    if (osrm && osrm.length >= 2) {
+      setRoute({ phase: "ready", points: osrm, source: "osrm" });
+    }
   }, [destination, position, spot]);
 
   useEffect(() => {
@@ -134,9 +132,8 @@ export function NavRouteClient({
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold">导航至 {spot.name}</p>
           <p className="truncate text-[11px] text-white/70">
-            {route.phase === "loading" && "正在规划路线…"}
             {route.phase === "ready" && route.source === "osrm" && "路线：道路网络（OSRM）"}
-            {route.phase === "ready" && route.source === "straight" && "路线：直线示意（路网不可用或未授权定位）"}
+            {route.phase === "ready" && route.source === "straight" && "路线：快速示意（正在尝试道路规划）"}
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
@@ -166,11 +163,6 @@ export function NavRouteClient({
       </header>
 
       <div className="relative min-h-0 flex-1">
-        {route.phase === "loading" && (
-          <div className="absolute inset-0 z-[1000] flex items-center justify-center bg-black/30 text-white">
-            <Loader2 className="size-8 animate-spin" aria-hidden />
-          </div>
-        )}
         <LeafletViewport
           className="h-full w-full"
           center={destination}

@@ -71,7 +71,10 @@ export async function fetchSpotsPayloadClient(): Promise<SpotsPayload> {
     };
   }
   try {
-    const res = await fetch(apiUrl("/api/spots"), { cache: "no-store" });
+    const res = await fetch(apiUrl("/api/spots"), {
+      cache: "no-store",
+      signal: AbortSignal.timeout(3000),
+    });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const json = await res.json();
     const parsed = parseListPayload(json);
@@ -102,6 +105,7 @@ export async function fetchSpotsPayloadServer(): Promise<SpotsPayload> {
   try {
     const res = await fetch(`${base}/api/spots`, {
       next: { revalidate: 30 },
+      signal: AbortSignal.timeout(3000),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const json = await res.json();
@@ -130,6 +134,7 @@ export async function fetchSpotByIdClient(id: string): Promise<FishingSpot | nul
   try {
     const res = await fetch(apiUrl(`/api/spots/${encodeURIComponent(id)}`), {
       cache: "no-store",
+      signal: AbortSignal.timeout(3000),
     });
     if (res.status === 404) return null;
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -153,6 +158,7 @@ export async function fetchSpotByIdServer(
   try {
     const res = await fetch(`${base}/api/spots/${encodeURIComponent(id)}`, {
       next: { revalidate: 30 },
+      signal: AbortSignal.timeout(3000),
     });
     if (res.ok) {
       const json = await res.json();

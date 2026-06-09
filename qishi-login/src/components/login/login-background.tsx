@@ -2,7 +2,10 @@ import Image from "next/image";
 
 export function LoginBackground() {
   return (
-    <div className="pointer-events-none absolute inset-0 z-0" aria-hidden>
+    <div
+      className="pointer-events-none absolute inset-0 z-0 bg-gradient-to-b from-[#8fc7ff] via-[#dceeff] to-white"
+      aria-hidden
+    >
       <Image
         src="https://unsplash.com/photos/UdZ-QXiHP-A/download?force=true&w=1600"
         alt=""

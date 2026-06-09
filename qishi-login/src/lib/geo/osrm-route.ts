@@ -18,10 +18,12 @@ export async function fetchDrivingRoute(
   to: LatLng
 ): Promise<LatLng[] | null> {
   const coords = `${from.lng},${from.lat};${to.lng},${to.lat}`;
-  const url = `https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson`;
+  const url = `https://router.project-osrm.org/route/v1/driving/${coords}?overview=simplified&geometries=geojson`;
 
   try {
-    const res = await fetch(url);
+    const res = await fetch(url, {
+      signal: AbortSignal.timeout(4000),
+    });
     if (!res.ok) return null;
     const data = (await res.json()) as OsrmRouteResponse;
     if (data.code !== "Ok" || !data.routes?.[0]?.geometry?.coordinates?.length) {
