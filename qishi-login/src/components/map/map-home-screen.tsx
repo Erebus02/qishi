@@ -26,7 +26,7 @@ const NEARBY_LIST_LIMIT = 8;
 
 /**
  * 首页地图（mobile-first）
- * - 底层：Leaflet 轻量点位图，不请求海外瓦片，保证国内网络下快速可用。
+ * - 底层：高德 JS API，加载失败时自动回退到本地轻量点位图。
  * - 导航「走高德/百度」由外链唤起（见 nav 页）；此处地图瓦片未接高德 JS（可按 PRD 替换为 AMap）。
  * - 浮层 bottom 统一使用 var(--qishi-bottom-safe)，避免被固定底栏挡住。
  */

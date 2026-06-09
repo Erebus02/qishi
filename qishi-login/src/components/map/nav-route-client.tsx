@@ -127,7 +127,7 @@ export function NavRouteClient({
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold">导航至 {spot.name}</p>
           <p className="truncate text-[11px] text-white/70">
-            {route.phase === "ready" && "路线：轻量位置示意"}
+            {route.phase === "ready" && "路线：高德驾车规划"}
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
@@ -176,7 +176,7 @@ export function NavRouteClient({
           {status === "error" && "定位失败：已用默认起点"}
         </p>
         <p className="text-white/60">
-          当前为轻量位置示意；实际道路导航请使用高德或百度地图。
+          地图与驾车路线由高德地图提供，仅供出行参考。
         </p>
       </footer>
     </div>

@@ -1,6 +1,5 @@
 "use client";
 
-import L from "leaflet";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { LatLng } from "@/lib/geo/osrm-route";
@@ -23,32 +22,95 @@ type Props = {
   fit: FitMode;
 };
 
-function markerStyle(kind: MapMarkerSpec["kind"]): L.CircleMarkerOptions {
-  if (kind === "user") {
-    return {
-      radius: 12,
-      color: "#ffffff",
-      weight: 3,
-      fillColor: "#1E90FF",
-      fillOpacity: 1,
-    };
-  }
-  if (kind === "destination") {
-    return {
-      radius: 11,
-      color: "#b91c1c",
-      weight: 3,
-      fillColor: "#ef4444",
-      fillOpacity: 1,
-    };
-  }
-  return {
-    radius: 8,
-    color: "#14532d",
-    weight: 2,
-    fillColor: "#22c55e",
-    fillOpacity: 0.95,
+type AMapMap = {
+  add: (overlays: unknown | unknown[]) => void;
+  remove: (overlays: unknown | unknown[]) => void;
+  destroy: () => void;
+  setCenter: (center: [number, number]) => void;
+  setZoom: (zoom: number) => void;
+  setFitView: (overlays?: unknown[], immediately?: boolean, avoid?: number[]) => void;
+  resize: () => void;
+};
+
+type AMapMarker = {
+  on: (event: string, handler: () => void) => void;
+};
+
+type AMapDriving = {
+  search: (
+    origin: [number, number],
+    destination: [number, number],
+    callback: (status: string) => void
+  ) => void;
+  clear: () => void;
+};
+
+type AMapApi = {
+  Map: new (
+    element: HTMLElement,
+    options: Record<string, unknown>
+  ) => AMapMap;
+  Marker: new (options: Record<string, unknown>) => AMapMarker;
+  Polyline: new (options: Record<string, unknown>) => unknown;
+  InfoWindow: new (options: Record<string, unknown>) => {
+    open: (map: AMapMap, position: [number, number]) => void;
   };
+  ToolBar: new (options?: Record<string, unknown>) => unknown;
+  Scale: new (options?: Record<string, unknown>) => unknown;
+  Driving: new (options: Record<string, unknown>) => AMapDriving;
+};
+
+declare global {
+  interface Window {
+    AMap?: AMapApi;
+    _AMapSecurityConfig?: { securityJsCode: string };
+  }
+}
+
+let amapPromise: Promise<AMapApi> | null = null;
+
+function loadAmap(): Promise<AMapApi> {
+  if (window.AMap) return Promise.resolve(window.AMap);
+  if (amapPromise) return amapPromise;
+
+  const key = process.env.NEXT_PUBLIC_AMAP_KEY;
+  const securityCode = process.env.NEXT_PUBLIC_AMAP_SECURITY_CODE;
+  if (!key || !securityCode) {
+    return Promise.reject(new Error("高德地图环境变量未配置"));
+  }
+
+  window._AMapSecurityConfig = { securityJsCode: securityCode };
+  amapPromise = new Promise<AMapApi>((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = `https://webapi.amap.com/maps?v=2.0&key=${encodeURIComponent(
+      key
+    )}&plugin=AMap.ToolBar,AMap.Scale,AMap.Driving`;
+    script.async = true;
+    script.onload = () => {
+      if (window.AMap) resolve(window.AMap);
+      else reject(new Error("高德地图初始化失败"));
+    };
+    script.onerror = () => reject(new Error("高德地图加载失败"));
+    document.head.appendChild(script);
+  });
+  return amapPromise;
+}
+
+function markerContent(kind: MapMarkerSpec["kind"]): HTMLDivElement {
+  const colors =
+    kind === "user"
+      ? { fill: "#1E90FF", border: "#ffffff", size: 22 }
+      : kind === "destination"
+        ? { fill: "#ef4444", border: "#991b1b", size: 22 }
+        : { fill: "#22c55e", border: "#ffffff", size: 18 };
+  const el = document.createElement("div");
+  el.style.width = `${colors.size}px`;
+  el.style.height = `${colors.size}px`;
+  el.style.borderRadius = "999px";
+  el.style.background = colors.fill;
+  el.style.border = `3px solid ${colors.border}`;
+  el.style.boxShadow = "0 4px 12px rgba(15,23,42,.24)";
+  return el;
 }
 
 export function LeafletViewport({
@@ -60,127 +122,127 @@ export function LeafletViewport({
   fit,
 }: Props) {
   const elRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<L.Map | null>(null);
-  const fgRef = useRef<L.FeatureGroup | null>(null);
-  const [mapReady, setMapReady] = useState(false);
+  const mapRef = useRef<AMapMap | null>(null);
+  const apiRef = useRef<AMapApi | null>(null);
+  const overlaysRef = useRef<unknown[]>([]);
+  const drivingRef = useRef<AMapDriving | null>(null);
+  const [status, setStatus] = useState<"loading" | "ready" | "fallback">(
+    "loading"
+  );
 
   const redraw = useCallback(() => {
     const map = mapRef.current;
-    const fg = fgRef.current;
-    if (!map || !fg) return;
+    const AMap = apiRef.current;
+    if (!map || !AMap) return;
 
-    fg.clearLayers();
+    drivingRef.current?.clear();
+    drivingRef.current = null;
+    if (overlaysRef.current.length) map.remove(overlaysRef.current);
 
-    for (const m of markers) {
-      const cm = L.circleMarker([m.lat, m.lng], markerStyle(m.kind))
-        .bindPopup(m.label)
-        .addTo(fg);
-      cm.on("click", () => {
-        cm.openPopup();
+    const overlays: unknown[] = markers.map((marker) => {
+      const position: [number, number] = [marker.lng, marker.lat];
+      const item = new AMap.Marker({
+        position,
+        content: markerContent(marker.kind),
+        offset: [-11, -11],
+        zIndex: marker.kind === "user" ? 120 : 110,
+      });
+      const info = new AMap.InfoWindow({
+        content: `<div style="padding:6px 10px;font-size:13px">${marker.label}</div>`,
+        offset: [0, -14],
+      });
+      item.on("click", () => info.open(map, position));
+      return item;
+    });
+
+    if (polyline && polyline.length >= 2) {
+      const path = polyline.map(
+        (point) => [point.lng, point.lat] as [number, number]
+      );
+      const line = new AMap.Polyline({
+        path,
+        strokeColor: "#1E90FF",
+        strokeWeight: 6,
+        strokeOpacity: 0.92,
+        lineJoin: "round",
+        lineCap: "round",
+      });
+      overlays.push(line);
+
+      const origin = path[0];
+      const destination = path[path.length - 1];
+      const driving = new AMap.Driving({
+        map,
+        hideMarkers: true,
+        showTraffic: false,
+        autoFitView: true,
+      });
+      drivingRef.current = driving;
+      driving.search(origin, destination, (routeStatus) => {
+        if (routeStatus === "complete") map.remove(line);
       });
     }
 
-    if (polyline && polyline.length >= 2) {
-      const latlngs = polyline.map((p) => [p.lat, p.lng] as L.LatLngExpression);
-      L.polyline(latlngs, {
-        color: "#1E90FF",
-        weight: 6,
-        opacity: 0.92,
-        lineJoin: "round",
-        lineCap: "round",
-      }).addTo(fg);
+    map.add(overlays);
+    overlaysRef.current = overlays;
 
-      if (fit === "polyline") {
-        const bounds = L.latLngBounds(latlngs);
-        map.fitBounds(bounds, { padding: [40, 40], maxZoom: 15, animate: true });
-        return;
-      }
+    if (fit !== "none" && overlays.length) {
+      map.setFitView(overlays, false, [64, 64, 64, 64]);
+    } else {
+      map.setCenter([center.lng, center.lat]);
+      map.setZoom(zoom);
     }
-
-    if (fit === "markers" && markers.length > 0) {
-      if (markers.length === 1) {
-        const m = markers[0];
-        map.setView([m.lat, m.lng], Math.min(zoom, 15), { animate: true });
-        return;
-      }
-      const bounds = L.latLngBounds(markers.map((m) => [m.lat, m.lng]));
-      map.fitBounds(bounds, { padding: [56, 56], maxZoom: 14, animate: true });
-      return;
-    }
-
-    map.setView([center.lat, center.lng], zoom, { animate: true });
-  }, [center.lat, center.lng, zoom, markers, polyline, fit]);
+  }, [center.lat, center.lng, fit, markers, polyline, zoom]);
 
   useEffect(() => {
     const el = elRef.current;
-    if (!el || mapRef.current) return;
+    if (!el) return;
+    let cancelled = false;
 
-    /**
-     * 手机浏览器：单指拖移、双指捏合缩放、双击放大（与常见「地图 App」一致）。
-     * 底图当前为 OpenStreetMap 栅格瓦片；若 PRD 要求切换高德 JS SDK，可在此替换 L.tileLayer 为 AMap 或叠加层。
-     */
-    const map = L.map(el, {
-      zoomControl: true,
-      attributionControl: true,
-      preferCanvas: false,
-      tap: true,
-      touchZoom: true,
-      dragging: true,
-      doubleClickZoom: true,
-      scrollWheelZoom: true,
-      boxZoom: false,
-      keyboard: false,
-    }).setView([center.lat, center.lng], zoom);
-    const fg = L.featureGroup().addTo(map);
-    mapRef.current = map;
-    fgRef.current = fg;
-    setMapReady(true);
-
-    const onResize = () => map.invalidateSize();
-    window.addEventListener("resize", onResize);
-    window.addEventListener("orientationchange", onResize);
-    const t = window.setTimeout(() => map.invalidateSize(), 400);
+    void loadAmap()
+      .then((AMap) => {
+        if (cancelled || !elRef.current) return;
+        const map = new AMap.Map(elRef.current, {
+          viewMode: "2D",
+          zoom,
+          center: [center.lng, center.lat],
+          mapStyle: "amap://styles/whitesmoke",
+          resizeEnable: true,
+        });
+        map.add([new AMap.ToolBar({ position: "LT" }), new AMap.Scale()]);
+        apiRef.current = AMap;
+        mapRef.current = map;
+        setStatus("ready");
+      })
+      .catch(() => {
+        if (!cancelled) setStatus("fallback");
+      });
 
     return () => {
-      window.clearTimeout(t);
-      window.removeEventListener("resize", onResize);
-      window.removeEventListener("orientationchange", onResize);
-      setMapReady(false);
-      map.remove();
+      cancelled = true;
+      drivingRef.current?.clear();
+      mapRef.current?.destroy();
       mapRef.current = null;
-      fgRef.current = null;
+      apiRef.current = null;
+      overlaysRef.current = [];
     };
-    // 地图只创建一次；中心与图层由 redraw 同步
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 仅挂载时创建 Leaflet 实例
+    // 地图实例只创建一次，中心和覆盖物由 redraw 更新。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    if (!mapReady) return;
+    if (status !== "ready") return;
     redraw();
-  }, [mapReady, redraw]);
+  }, [redraw, status]);
 
-  /** 首页等多层 flex/absolute 下，首帧容器常为 0 高；尺寸变化后必须让 Leaflet 重算，否则瓦片与定位点不显示 */
   useEffect(() => {
     const map = mapRef.current;
     const el = elRef.current;
-    if (!mapReady || !map || !el) return;
-
-    const bump = () => {
-      map.invalidateSize({ animate: false });
-      redraw();
-    };
-
-    const ro = new ResizeObserver(() => bump());
-    ro.observe(el);
-    const t = window.setTimeout(bump, 0);
-    const t2 = window.setTimeout(bump, 320);
-
-    return () => {
-      ro.disconnect();
-      window.clearTimeout(t);
-      window.clearTimeout(t2);
-    };
-  }, [mapReady, redraw]);
+    if (status !== "ready" || !map || !el) return;
+    const observer = new ResizeObserver(() => map.resize());
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [status]);
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-[#dbe9f3]">
@@ -193,14 +255,17 @@ export function LeafletViewport({
           backgroundSize: "32px 32px, 32px 32px, 100% 100%, 100% 100%",
         }}
       />
-      <div
-        ref={elRef}
-        className={className ?? "h-full w-full"}
-        style={{ background: "transparent" }}
-      />
-      <div className="pointer-events-none absolute bottom-3 left-1/2 z-[900] -translate-x-1/2 rounded-full bg-white/90 px-3 py-1.5 text-[11px] text-slate-600 shadow-md backdrop-blur">
-        轻量地图 · 点位与路线仅作位置示意
-      </div>
+      <div ref={elRef} className={className ?? "h-full w-full"} />
+      {status === "loading" ? (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-sm text-slate-600">
+          正在加载高德地图…
+        </div>
+      ) : null}
+      {status === "fallback" ? (
+        <div className="pointer-events-none absolute bottom-3 left-1/2 z-[900] -translate-x-1/2 rounded-full bg-white/90 px-3 py-1.5 text-[11px] text-slate-600 shadow-md backdrop-blur">
+          高德地图未配置，已使用轻量地图
+        </div>
+      ) : null}
     </div>
   );
 }
