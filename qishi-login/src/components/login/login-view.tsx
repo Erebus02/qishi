@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { startTransition, useCallback, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { Check, Loader2, MessageCircle, Smartphone } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { loginFocusRing } from "@/lib/login-styles";
@@ -23,9 +23,9 @@ type SecondaryMode = "none" | "sms" | "password";
 export function LoginView() {
   const router = useRouter();
   const [secondary, setSecondary] = useState<SecondaryMode>("none");
-  /** 不用 useTransition 包 async：否则 isPending 与 await 后的导航容易不同步（React 不推荐 async startTransition）。 */
   const [isPending, setIsPending] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [agreed, setAgreed] = useState(false);
 
   const finishLogin = useCallback(() => {
     startTransition(() => {
@@ -35,6 +35,10 @@ export function LoginView() {
 
   const handlePrimaryLogin = useCallback(() => {
     if (isPending) return;
+    if (!agreed) {
+      setNotice("请先阅读并同意用户协议和隐私政策");
+      return;
+    }
     setNotice(null);
     setIsPending(true);
     void (async () => {
@@ -63,142 +67,162 @@ export function LoginView() {
         setIsPending(false);
       }
     })();
-  }, [isPending, finishLogin]);
+  }, [agreed, isPending, finishLogin]);
+
+  const handleUnavailable = useCallback(
+    (label: string) => {
+      if (!agreed) {
+        setNotice("请先阅读并同意用户协议和隐私政策");
+        return;
+      }
+      setNotice(`${label}登录尚未接入，请使用手机号登录。`);
+    },
+    [agreed]
+  );
 
   return (
-    <div className="relative flex min-h-dvh w-full flex-col overflow-hidden bg-[#F2F4F7] dark:bg-gray-900">
+    <div className="relative min-h-dvh w-full overflow-x-hidden bg-white">
       <LoginBackground />
 
-      <div className="relative z-10 w-full px-5 pt-[max(1rem,env(safe-area-inset-top))]">
-        <Link
-          href="/map"
-          className={cn(
-            "inline-flex h-11 w-11 items-center justify-center rounded-lg text-2xl leading-none text-slate-800 hover:bg-black/5 dark:text-white dark:hover:bg-white/10",
-            loginFocusRing()
-          )}
-          aria-label="进入首页（跳过登录）"
-        >
-          ‹
-        </Link>
-      </div>
-
-      <div className="relative z-10 flex flex-1 flex-col items-center justify-center px-6 pb-12 pt-2 sm:px-8 sm:pb-16">
-        <div className="mb-10 flex flex-col items-center text-center sm:mb-12">
+      <main className="relative z-10 mx-auto flex min-h-dvh w-full max-w-md flex-col items-center px-8 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(3.5rem,env(safe-area-inset-top))]">
+        <section className="flex flex-col items-center text-center">
           <LoginBrandMark />
-          <h1 className="mt-7 text-[2rem] font-bold italic leading-none tracking-tight text-[#2d4a6f] dark:text-[#8ea8cc] sm:text-4xl">
+          <h1 className="mt-6 text-[44px] font-black italic leading-none text-[#10213d]">
             起势
           </h1>
-          <p className="mt-3 max-w-[18rem] text-[11px] font-normal leading-relaxed tracking-[0.02em] text-[#3d5a80]/88 dark:text-[#64748b] sm:text-xs">
+          <p className="mt-4 text-[15px] leading-6 text-[#607391]">
             钓有所乐 · 分享每一次收获
           </p>
-        </div>
+        </section>
 
-        <Button
-          type="button"
-          onClick={handlePrimaryLogin}
-          disabled={isPending}
-          className={cn(
-            "mb-6 h-auto w-full max-w-[300px] rounded-full border-0 bg-[#1E90FF] px-6 py-3.5 text-base font-medium text-white shadow-lg shadow-black/15 transition-colors hover:bg-[#1873CC] disabled:opacity-90 dark:shadow-black/40",
-            loginFocusRing()
-          )}
-          aria-busy={isPending}
-        >
-          <span className="inline-flex items-center justify-center gap-2">
+        <section className="mt-auto w-full pt-20">
+          <Button
+            type="button"
+            onClick={handlePrimaryLogin}
+            disabled={isPending}
+            className={cn(
+              "h-14 w-full rounded-full border-0 bg-gradient-to-r from-[#3B8CFF] to-[#006BFF] text-lg font-semibold text-white shadow-[0_14px_32px_rgba(47,128,255,0.30)] transition-transform hover:scale-[1.01] active:scale-[0.98] disabled:opacity-80",
+              loginFocusRing()
+            )}
+            aria-busy={isPending}
+          >
             {isPending ? (
-              <>
-                <Loader2 className="size-5 shrink-0 animate-spin" aria-hidden />
-                <span>登录中…</span>
-              </>
+              <Loader2 className="size-5 animate-spin" aria-hidden />
             ) : (
-              "本机登录一键登录"
+              <Smartphone className="size-[22px]" aria-hidden />
             )}
-          </span>
-        </Button>
+            <span>{isPending ? "登录中…" : "手机号登录"}</span>
+          </Button>
 
-        <div className="mb-6 flex items-center gap-3 text-sm text-slate-600 dark:text-white/80">
-          <button
+          <Button
             type="button"
-            onClick={() => {
-              setNotice(null);
-              setSecondary((s) => (s === "sms" ? "none" : "sms"));
-            }}
+            onClick={() => handleUnavailable("微信")}
             className={cn(
-              "rounded-md transition-colors hover:text-slate-900 dark:hover:text-white",
-              secondary === "sms" && "font-medium text-[#1E90FF] dark:text-white",
+              "mt-[18px] h-14 w-full rounded-full border border-white/80 bg-white/90 text-lg font-semibold text-[#1E293B] shadow-[0_10px_28px_rgba(15,30,51,0.10)] backdrop-blur-md transition-transform hover:bg-white active:scale-[0.98]",
               loginFocusRing()
             )}
           >
-            验证码登录
-          </button>
-          <span className="text-slate-400 dark:text-white/50" aria-hidden>
-            |
-          </span>
-          <button
-            type="button"
-            onClick={() => {
-              setNotice(null);
-              setSecondary((s) => (s === "password" ? "none" : "password"));
-            }}
-            className={cn(
-              "rounded-md transition-colors hover:text-slate-900 dark:hover:text-white",
-              secondary === "password" && "font-medium text-[#1E90FF] dark:text-white",
-              loginFocusRing()
-            )}
-          >
-            密码登录
-          </button>
-        </div>
+            <MessageCircle className="size-6 fill-[#22C55E] text-[#22C55E]" aria-hidden />
+            微信登录
+          </Button>
 
-        {secondary === "sms" ? (
-          <LoginSmsForm
-            onDone={finishLogin}
-            onError={(msg) => setNotice(msg || null)}
-          />
-        ) : null}
-        {secondary === "password" ? (
-          <LoginPasswordForm
-            onDone={finishLogin}
-            onError={(msg) => setNotice(msg || null)}
-          />
-        ) : null}
+          <div className="mt-5 flex items-center justify-center gap-3 text-sm">
+            <button
+              type="button"
+              onClick={() => {
+                setNotice(null);
+                setSecondary((s) => (s === "sms" ? "none" : "sms"));
+              }}
+              className={cn(
+                "rounded-md px-1 py-1 text-[#35506f] transition-colors hover:text-[#006BFF]",
+                secondary === "sms" && "font-semibold text-[#006BFF]",
+                loginFocusRing()
+              )}
+            >
+              验证码登录
+            </button>
+            <span className="text-slate-400" aria-hidden>|</span>
+            <button
+              type="button"
+              onClick={() => {
+                setNotice(null);
+                setSecondary((s) => (s === "password" ? "none" : "password"));
+              }}
+              className={cn(
+                "rounded-md px-1 py-1 text-[#35506f] transition-colors hover:text-[#006BFF]",
+                secondary === "password" && "font-semibold text-[#006BFF]",
+                loginFocusRing()
+              )}
+            >
+              密码登录
+            </button>
+          </div>
 
-        <div className="mb-6 text-sm text-slate-500 dark:text-white/60">第三方登录</div>
+          {secondary !== "none" ? (
+            <div className="mt-4 rounded-2xl border border-white/70 bg-white/88 p-4 shadow-[0_12px_30px_rgba(15,30,51,0.10)] backdrop-blur-xl">
+              {secondary === "sms" ? (
+                <LoginSmsForm onDone={finishLogin} onError={(msg) => setNotice(msg || null)} />
+              ) : (
+                <LoginPasswordForm onDone={finishLogin} onError={(msg) => setNotice(msg || null)} />
+              )}
+            </div>
+          ) : null}
 
-        {notice ? (
-          <p className="mb-4 max-w-[300px] text-center text-xs text-amber-700 dark:text-amber-200/90" role="status">
-            {notice}
-          </p>
-        ) : null}
+          <div className="mt-7 flex items-center gap-3">
+            <div className="h-px flex-1 bg-slate-400/35" />
+            <span className="text-sm text-[#475569]">其他登录方式</span>
+            <div className="h-px flex-1 bg-slate-400/35" />
+          </div>
 
-        <LoginThirdPartyRow
-          onUnavailable={(label) => {
-            setNotice(`${label}登录尚未接入，请使用「本机一键登录」或左上角进入地图。`);
-          }}
-        />
+          <div className="mt-5">
+            <LoginThirdPartyRow onUnavailable={handleUnavailable} />
+          </div>
 
-        <div className="max-w-sm px-1 text-center text-xs leading-relaxed text-slate-500 dark:text-white/60">
-          <span className="text-[#1E90FF] dark:text-[#4da3ff]">同意</span>
-          <Link
-            href="/legal/privacy"
-            className={cn(
-              "mx-1 text-[#1E90FF] underline underline-offset-2 dark:text-[#4da3ff]",
-              loginFocusRing()
-            )}
-          >
-            《隐私政策》
-          </Link>
-          和
-          <Link
-            href="/legal/purchase"
-            className={cn(
-              "ml-1 text-[#1E90FF] underline underline-offset-2 dark:text-[#4da3ff]",
-              loginFocusRing()
-            )}
-          >
-            《购买协议》
-          </Link>
-        </div>
-      </div>
+          {notice ? (
+            <p className="mt-4 text-center text-xs text-amber-700" role="status">
+              {notice}
+            </p>
+          ) : null}
+
+          <div className="mt-7 flex items-start justify-center gap-2 text-xs leading-5 text-[#8290a5]">
+            <button
+              type="button"
+              onClick={() => {
+                setAgreed((value) => !value);
+                setNotice(null);
+              }}
+              className={cn(
+                "mt-0.5 flex size-[18px] shrink-0 items-center justify-center rounded-full border transition-colors",
+                agreed
+                  ? "border-[#2F80FF] bg-[#2F80FF] text-white"
+                  : "border-[#B8C4D4] bg-white/65 text-transparent",
+                loginFocusRing("rounded-full")
+              )}
+              role="checkbox"
+              aria-checked={agreed}
+              aria-label="同意用户协议和隐私政策"
+            >
+              <Check className="size-3" strokeWidth={3} aria-hidden />
+            </button>
+            <p>
+              我已阅读并同意
+              <Link
+                href="/legal/purchase"
+                className={cn("mx-0.5 text-[#2F80FF]", loginFocusRing())}
+              >
+                《用户协议》
+              </Link>
+              和
+              <Link
+                href="/legal/privacy"
+                className={cn("ml-0.5 text-[#2F80FF]", loginFocusRing())}
+              >
+                《隐私政策》
+              </Link>
+            </p>
+          </div>
+        </section>
+      </main>
     </div>
   );
 }
