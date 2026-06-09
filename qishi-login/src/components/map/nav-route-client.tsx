@@ -9,7 +9,6 @@ import {
   type FishingSpot,
 } from "@/lib/geo/fishing-spots";
 import {
-  fetchDrivingRoute,
   straightLineRoute,
   type LatLng,
 } from "@/lib/geo/osrm-route";
@@ -25,7 +24,7 @@ import { LeafletViewport, type MapMarkerSpec } from "./leaflet-viewport";
 type RouteState =
   | { phase: "idle" }
   | { phase: "loading" }
-  | { phase: "ready"; points: LatLng[]; source: "osrm" | "straight" }
+  | { phase: "ready"; points: LatLng[]; source: "straight" }
   | { phase: "error"; message: string };
 
 export function NavRouteClient({
@@ -67,7 +66,7 @@ export function NavRouteClient({
     [spot]
   );
 
-  const compute = useCallback(async () => {
+  const compute = useCallback(() => {
     if (!spot) return;
     const origin = position ?? DEFAULT_MAP_CENTER;
     setRoute({
@@ -75,15 +74,11 @@ export function NavRouteClient({
       points: straightLineRoute(origin, destination),
       source: "straight",
     });
-    const osrm = await fetchDrivingRoute(origin, destination);
-    if (osrm && osrm.length >= 2) {
-      setRoute({ phase: "ready", points: osrm, source: "osrm" });
-    }
   }, [destination, position, spot]);
 
   useEffect(() => {
     if (!spot) return;
-    void compute();
+    compute();
   }, [compute, spot, position]);
 
   const origin = position ?? DEFAULT_MAP_CENTER;
@@ -132,8 +127,7 @@ export function NavRouteClient({
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold">导航至 {spot.name}</p>
           <p className="truncate text-[11px] text-white/70">
-            {route.phase === "ready" && route.source === "osrm" && "路线：道路网络（OSRM）"}
-            {route.phase === "ready" && route.source === "straight" && "路线：快速示意（正在尝试道路规划）"}
+            {route.phase === "ready" && "路线：轻量位置示意"}
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
@@ -150,7 +144,7 @@ export function NavRouteClient({
             type="button"
             onClick={() => {
               request();
-              void compute();
+              compute();
             }}
             className={cn(
               "rounded-full bg-white/10 px-3 py-1.5 text-xs hover:bg-white/15",
@@ -182,7 +176,7 @@ export function NavRouteClient({
           {status === "error" && "定位失败：已用默认起点"}
         </p>
         <p className="text-white/60">
-          地图数据 © OpenStreetMap；路线由 OSRM 公共服务估算，仅供参考。
+          当前为轻量位置示意；实际道路导航请使用高德或百度地图。
         </p>
       </footer>
     </div>

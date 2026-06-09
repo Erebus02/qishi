@@ -63,7 +63,6 @@ export function LeafletViewport({
   const mapRef = useRef<L.Map | null>(null);
   const fgRef = useRef<L.FeatureGroup | null>(null);
   const [mapReady, setMapReady] = useState(false);
-  const [tilesUnavailable, setTilesUnavailable] = useState(false);
 
   const redraw = useCallback(() => {
     const map = mapRef.current;
@@ -132,27 +131,6 @@ export function LeafletViewport({
       boxZoom: false,
       keyboard: false,
     }).setView([center.lat, center.lng], zoom);
-    const tiles = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 19,
-      keepBuffer: 1,
-      updateWhenIdle: true,
-      updateWhenZooming: false,
-      attribution:
-        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-    });
-    let firstTileLoaded = false;
-    const tileTimeout = window.setTimeout(() => {
-      if (firstTileLoaded) return;
-      setTilesUnavailable(true);
-      tiles.removeFrom(map);
-    }, 3500);
-    tiles.on("tileload", () => {
-      firstTileLoaded = true;
-      setTilesUnavailable(false);
-      window.clearTimeout(tileTimeout);
-    });
-    tiles.addTo(map);
-
     const fg = L.featureGroup().addTo(map);
     mapRef.current = map;
     fgRef.current = fg;
@@ -165,7 +143,6 @@ export function LeafletViewport({
 
     return () => {
       window.clearTimeout(t);
-      window.clearTimeout(tileTimeout);
       window.removeEventListener("resize", onResize);
       window.removeEventListener("orientationchange", onResize);
       setMapReady(false);
@@ -221,11 +198,9 @@ export function LeafletViewport({
         className={className ?? "h-full w-full"}
         style={{ background: "transparent" }}
       />
-      {tilesUnavailable ? (
-        <div className="pointer-events-none absolute bottom-3 left-1/2 z-[900] -translate-x-1/2 rounded-full bg-white/90 px-3 py-1.5 text-[11px] text-slate-600 shadow-md backdrop-blur">
-          网络较慢，已切换轻量地图
-        </div>
-      ) : null}
+      <div className="pointer-events-none absolute bottom-3 left-1/2 z-[900] -translate-x-1/2 rounded-full bg-white/90 px-3 py-1.5 text-[11px] text-slate-600 shadow-md backdrop-blur">
+        轻量地图 · 点位与路线仅作位置示意
+      </div>
     </div>
   );
 }
