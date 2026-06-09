@@ -69,15 +69,23 @@ declare global {
 
 let amapPromise: Promise<AMapApi> | null = null;
 
-function loadAmap(): Promise<AMapApi> {
+async function fetchAmapConfig(): Promise<{
+  key: string;
+  securityCode: string;
+}> {
+  const response = await fetch("/api/map-config", {
+    cache: "no-store",
+    signal: AbortSignal.timeout(5000),
+  });
+  if (!response.ok) throw new Error("高德地图环境变量未配置");
+  return response.json() as Promise<{ key: string; securityCode: string }>;
+}
+
+async function loadAmap(): Promise<AMapApi> {
   if (window.AMap) return Promise.resolve(window.AMap);
   if (amapPromise) return amapPromise;
 
-  const key = process.env.NEXT_PUBLIC_AMAP_KEY;
-  const securityCode = process.env.NEXT_PUBLIC_AMAP_SECURITY_CODE;
-  if (!key || !securityCode) {
-    return Promise.reject(new Error("高德地图环境变量未配置"));
-  }
+  const { key, securityCode } = await fetchAmapConfig();
 
   window._AMapSecurityConfig = { securityJsCode: securityCode };
   amapPromise = new Promise<AMapApi>((resolve, reject) => {
