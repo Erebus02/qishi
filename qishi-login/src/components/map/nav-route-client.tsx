@@ -2,12 +2,14 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ChevronLeft, Loader2 } from "lucide-react";
+import { ChevronLeft, Loader2, Navigation } from "lucide-react";
 
 import {
   DEFAULT_MAP_CENTER,
   type FishingSpot,
 } from "@/lib/geo/fishing-spots";
+import { buildAmapNavigationUrl } from "@/lib/geo/external-map-nav-links";
+import { openExternalMapUrl } from "@/lib/geo/open-external-map-url";
 import {
   straightLineRoute,
   type LatLng,
@@ -101,6 +103,12 @@ export function NavRouteClient({
 
   const polyline =
     route.phase === "ready" && route.points.length >= 2 ? route.points : null;
+  const destinationName = spot?.name ?? "钓点";
+  const startNavigation = useCallback(() => {
+    openExternalMapUrl(
+      buildAmapNavigationUrl(destination.lat, destination.lng, destinationName)
+    );
+  }, [destination.lat, destination.lng, destinationName]);
 
   if (!spot) {
     return (
@@ -167,7 +175,18 @@ export function NavRouteClient({
         />
       </div>
 
-      <footer className="relative z-[1100] space-y-1 border-t border-white/10 bg-zinc-950/90 px-4 py-3 text-[11px] text-white/80 backdrop-blur">
+      <footer className="relative z-[1100] space-y-2 border-t border-white/10 bg-zinc-950/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 text-[11px] text-white/80 backdrop-blur">
+        <button
+          type="button"
+          onClick={startNavigation}
+          className={cn(
+            "flex h-12 w-full items-center justify-center gap-2 rounded-full bg-[#1677ff] text-sm font-semibold text-white shadow-lg shadow-blue-950/30 hover:bg-[#0f6de8]",
+            loginFocusRing()
+          )}
+        >
+          <Navigation className="size-5" aria-hidden />
+          打开高德并开始导航
+        </button>
         <p>
           定位状态：
           {status === "granted" && "已使用实时位置作为起点"}
@@ -176,7 +195,7 @@ export function NavRouteClient({
           {status === "error" && "定位失败：已用默认起点"}
         </p>
         <p className="text-white/60">
-          地图与驾车路线由高德地图提供，仅供出行参考。
+          当前页面用于路线预览；点击按钮后由高德地图提供实时语音导航。
         </p>
       </footer>
     </div>
