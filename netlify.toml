@@ -13,3 +13,5 @@
 [build.environment]
   NODE_VERSION = "20"
   NPM_FLAGS = "--legacy-peer-deps"
+  NEXT_PUBLIC_AMAP_KEY = "c9cbaf232614bf735231a9b65a199341"
+  NEXT_PUBLIC_AMAP_SECURITY_CODE = "c9fde74bca8bc1cb0fb1982aaf7bad9c"
