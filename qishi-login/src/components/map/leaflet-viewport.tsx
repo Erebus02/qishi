@@ -73,6 +73,17 @@ async function fetchAmapConfig(): Promise<{
   key: string;
   securityCode: string;
 }> {
+  const buildTimeKey = process.env.NEXT_PUBLIC_AMAP_KEY?.trim();
+  const buildTimeSecurityCode =
+    process.env.NEXT_PUBLIC_AMAP_SECURITY_CODE?.trim();
+
+  if (buildTimeKey && buildTimeSecurityCode) {
+    return {
+      key: buildTimeKey,
+      securityCode: buildTimeSecurityCode,
+    };
+  }
+
   const response = await fetch("/api/map-config", {
     cache: "no-store",
     signal: AbortSignal.timeout(5000),
