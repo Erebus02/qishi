@@ -24,6 +24,7 @@ type Props = {
 
 type AMapMap = {
   add: (overlays: unknown | unknown[]) => void;
+  addControl: (control: unknown) => void;
   remove: (overlays: unknown | unknown[]) => void;
   destroy: () => void;
   setCenter: (center: [number, number]) => void;
@@ -46,6 +47,7 @@ type AMapDriving = {
 };
 
 type AMapApi = {
+  plugin: (plugins: string[], callback: () => void) => void;
   Map: new (
     element: HTMLElement,
     options: Record<string, unknown>
@@ -103,13 +105,23 @@ async function loadAmap(): Promise<AMapApi> {
     const script = document.createElement("script");
     script.src = `https://webapi.amap.com/maps?v=2.0&key=${encodeURIComponent(
       key
-    )}&plugin=AMap.ToolBar,AMap.Scale,AMap.Driving`;
+    )}`;
     script.async = true;
     script.onload = () => {
-      if (window.AMap) resolve(window.AMap);
-      else reject(new Error("高德地图初始化失败"));
+      const AMap = window.AMap;
+      if (!AMap) {
+        reject(new Error("高德地图初始化失败"));
+        return;
+      }
+      AMap.plugin(
+        ["AMap.ToolBar", "AMap.Scale", "AMap.Driving"],
+        () => resolve(AMap)
+      );
     };
-    script.onerror = () => reject(new Error("高德地图加载失败"));
+    script.onerror = () => {
+      amapPromise = null;
+      reject(new Error("高德地图加载失败"));
+    };
     document.head.appendChild(script);
   });
   return amapPromise;
@@ -228,7 +240,8 @@ export function LeafletViewport({
           mapStyle: "amap://styles/whitesmoke",
           resizeEnable: true,
         });
-        map.add([new AMap.ToolBar({ position: "LT" }), new AMap.Scale()]);
+        map.addControl(new AMap.ToolBar({ position: "LT" }));
+        map.addControl(new AMap.Scale());
         apiRef.current = AMap;
         mapRef.current = map;
         setStatus("ready");
