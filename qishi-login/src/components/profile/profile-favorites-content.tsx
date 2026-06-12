@@ -4,7 +4,6 @@ import { Heart } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
-import { FALLBACK_FISHING_SPOTS } from "@/lib/geo/fishing-spots";
 import { fetchSpotsPayloadClient } from "@/lib/geo/spots-api";
 import {
   FAVORITES_CHANGED_EVENT,
@@ -23,10 +22,9 @@ export function ProfileFavoritesContent() {
 
   useEffect(() => {
     refresh();
-    void fetchSpotsPayloadClient().then((p) => {
+    void fetchSpotsPayloadClient({ limit: 300 }).then((p) => {
       const m: Record<string, string> = {};
       for (const s of p.spots) m[s.id] = s.name;
-      for (const s of FALLBACK_FISHING_SPOTS) if (!m[s.id]) m[s.id] = s.name;
       setNames(m);
     });
   }, [refresh]);

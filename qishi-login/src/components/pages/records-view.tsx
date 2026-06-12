@@ -25,10 +25,7 @@ import {
   PosterOfferAfterSaveDialog,
 } from "@/components/poster/poster-editor-modal";
 import { nextRouteApi } from "@/lib/api-base";
-import {
-  FALLBACK_FISHING_SPOTS,
-  type FishingSpot,
-} from "@/lib/geo/fishing-spots";
+import type { FishingSpot } from "@/lib/geo/fishing-spots";
 import { fetchSpotsPayloadClient } from "@/lib/geo/spots-api";
 import { reverseGeocodeLabel } from "@/lib/geo/reverse-geocode";
 import {
@@ -170,12 +167,12 @@ export function RecordsView() {
   const [newSpotLng, setNewSpotLng] = useState(114.429);
   const [newSpotFee, setNewSpotFee] = useState("");
   const [newSpotLocating, setNewSpotLocating] = useState(false);
-  const [platformSpots, setPlatformSpots] = useState<FishingSpot[]>(
-    FALLBACK_FISHING_SPOTS
-  );
+  const [platformSpots, setPlatformSpots] = useState<FishingSpot[]>([]);
 
   useEffect(() => {
-    void fetchSpotsPayloadClient().then((p) => setPlatformSpots(p.spots));
+    void fetchSpotsPayloadClient({ limit: 200 }).then((p) =>
+      setPlatformSpots(p.spots)
+    );
   }, []);
 
   const platformSpotNames = useMemo(

@@ -11,10 +11,7 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { CHINA_PROVINCE_CITIES, type ProvinceRegion } from "@/lib/geo/china-regions";
-import {
-  FALLBACK_FISHING_SPOTS,
-  type FishingSpot,
-} from "@/lib/geo/fishing-spots";
+import type { FishingSpot } from "@/lib/geo/fishing-spots";
 import { fetchSpotsPayloadClient } from "@/lib/geo/spots-api";
 import {
   buildAmapNavigationUrl,
@@ -212,9 +209,7 @@ export function SpotsView() {
 
   const [userSpots, setUserSpots] = useState<UserMarkedSpot[]>([]);
   const [fishingRecords, setFishingRecords] = useState<FishingRecord[]>([]);
-  const [platformSpots, setPlatformSpots] = useState<FishingSpot[]>(
-    FALLBACK_FISHING_SPOTS
-  );
+  const [platformSpots, setPlatformSpots] = useState<FishingSpot[]>([]);
 
   const platformCoords = useMemo(
     () =>
@@ -246,7 +241,9 @@ export function SpotsView() {
   }, []);
 
   useEffect(() => {
-    void fetchSpotsPayloadClient().then((p) => setPlatformSpots(p.spots));
+    void fetchSpotsPayloadClient({ limit: LIST_RENDER_LIMIT }).then((p) =>
+      setPlatformSpots(p.spots)
+    );
   }, []);
 
   useEffect(() => {

@@ -3,7 +3,6 @@ import { readAdminSpotsPayload } from "@/lib/admin/admin-spots-storage";
 
 import {
   DEFAULT_MAP_CENTER,
-  FALLBACK_FISHING_SPOTS,
   type FishingSpot,
 } from "./fishing-spots";
 import { isWaterSpotCategory } from "./water-spot-category";
@@ -11,6 +10,13 @@ import { isWaterSpotCategory } from "./water-spot-category";
 export type SpotsPayload = {
   spots: FishingSpot[];
   defaultCenter: { lat: number; lng: number };
+};
+
+export type FetchSpotsOptions = {
+  lat?: number;
+  lng?: number;
+  limit?: number;
+  q?: string;
 };
 
 function normalizeSpot(raw: unknown): FishingSpot | null {
@@ -63,13 +69,28 @@ export function getBackendBaseUrl(): string | undefined {
   );
 }
 
-/** 浏览器：未配置后端地址时使用本地静态兜底数据 */
-export async function fetchSpotsPayloadClient(): Promise<SpotsPayload> {
+function buildSpotsPath(options?: FetchSpotsOptions) {
+  const params = new URLSearchParams();
+  if (typeof options?.lat === "number") params.set("lat", String(options.lat));
+  if (typeof options?.lng === "number") params.set("lng", String(options.lng));
+  if (typeof options?.limit === "number") {
+    params.set("limit", String(options.limit));
+  }
+  const q = options?.q?.trim();
+  if (q) params.set("q", q);
+  const qs = params.toString();
+  return qs ? `/api/spots?${qs}` : "/api/spots";
+}
+
+/** 浏览器：默认通过同域 API 按需读取，不把全国库整包塞进首屏 */
+export async function fetchSpotsPayloadClient(
+  options?: FetchSpotsOptions
+): Promise<SpotsPayload> {
   const adminPayload = readAdminSpotsPayload();
-  if (adminPayload) return adminPayload;
+  if (adminPayload && !options) return adminPayload;
 
   try {
-    const res = await fetch(apiUrl("/api/spots"), {
+    const res = await fetch(apiUrl(buildSpotsPath(options)), {
       cache: "no-store",
       signal: AbortSignal.timeout(3000),
     });
@@ -78,14 +99,14 @@ export async function fetchSpotsPayloadClient(): Promise<SpotsPayload> {
     const parsed = parseListPayload(json);
     if (!parsed || parsed.spots.length === 0) {
       return {
-        spots: [...FALLBACK_FISHING_SPOTS],
+        spots: [],
         defaultCenter: { ...DEFAULT_MAP_CENTER },
       };
     }
     return parsed;
   } catch {
     return {
-      spots: [...FALLBACK_FISHING_SPOTS],
+      spots: [],
       defaultCenter: { ...DEFAULT_MAP_CENTER },
     };
   }
@@ -95,6 +116,7 @@ export async function fetchSpotsPayloadClient(): Promise<SpotsPayload> {
 export async function fetchSpotsPayloadServer(): Promise<SpotsPayload> {
   const base = getBackendBaseUrl();
   if (!base) {
+    const { FALLBACK_FISHING_SPOTS } = await import("./fishing-spots-database");
     return {
       spots: [...FALLBACK_FISHING_SPOTS],
       defaultCenter: { ...DEFAULT_MAP_CENTER },
@@ -109,6 +131,7 @@ export async function fetchSpotsPayloadServer(): Promise<SpotsPayload> {
     const json = await res.json();
     const parsed = parseListPayload(json);
     if (!parsed || parsed.spots.length === 0) {
+      const { FALLBACK_FISHING_SPOTS } = await import("./fishing-spots-database");
       return {
         spots: [...FALLBACK_FISHING_SPOTS],
         defaultCenter: { ...DEFAULT_MAP_CENTER },
@@ -116,6 +139,7 @@ export async function fetchSpotsPayloadServer(): Promise<SpotsPayload> {
     }
     return parsed;
   } catch {
+    const { FALLBACK_FISHING_SPOTS } = await import("./fishing-spots-database");
     return {
       spots: [...FALLBACK_FISHING_SPOTS],
       defaultCenter: { ...DEFAULT_MAP_CENTER },
@@ -138,15 +162,17 @@ export async function fetchSpotByIdClient(id: string): Promise<FishingSpot | nul
     const json = await res.json();
     return normalizeSpot(json);
   } catch {
-    return FALLBACK_FISHING_SPOTS.find((s) => s.id === id) ?? null;
+    return null;
   }
 }
 
 export async function fetchSpotByIdServer(
   id: string
 ): Promise<FishingSpot | null> {
-  const fallback = (): FishingSpot | null =>
-    FALLBACK_FISHING_SPOTS.find((s) => s.id === id) ?? null;
+  const fallback = async (): Promise<FishingSpot | null> => {
+    const { FALLBACK_FISHING_SPOTS } = await import("./fishing-spots-database");
+    return FALLBACK_FISHING_SPOTS.find((s) => s.id === id) ?? null;
+  };
 
   const base = getBackendBaseUrl();
   if (!base) {

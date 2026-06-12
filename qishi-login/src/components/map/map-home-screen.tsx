@@ -6,14 +6,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
   DEFAULT_MAP_CENTER,
-  FALLBACK_FISHING_SPOTS,
   type FishingSpot,
 } from "@/lib/geo/fishing-spots";
 import { formatDistanceKm } from "@/lib/geo/haversine";
-import {
-  filterSpotsByQuery,
-  sortSpotsByDistanceFrom,
-} from "@/lib/geo/spot-search";
+import { sortSpotsByDistanceFrom } from "@/lib/geo/spot-search";
 import { fetchSpotsPayloadClient } from "@/lib/geo/spots-api";
 import { useUserLocation } from "@/lib/geo/use-user-location";
 import { FavoriteSpotButton } from "@/components/spots/favorite-spot-button";
@@ -36,32 +32,31 @@ export function MapHomeScreen() {
   const [showSpotCard, setShowSpotCard] = useState(true);
   const [draftQuery, setDraftQuery] = useState("");
   const [activeQuery, setActiveQuery] = useState("");
-  /** 先展示兜底列表，再在客户端替换为 API 数据 */
-  const [spots, setSpots] = useState<FishingSpot[]>(FALLBACK_FISHING_SPOTS);
+  const [spots, setSpots] = useState<FishingSpot[]>([]);
   const [mapCenter, setMapCenter] = useState(DEFAULT_MAP_CENTER);
-
-  useEffect(() => {
-    void fetchSpotsPayloadClient().then((p) => {
-      setSpots(p.spots);
-      setMapCenter(p.defaultCenter);
-    });
-  }, []);
 
   const geo = useUserLocation({ autoRequest: true });
 
   const origin = geo.position ?? mapCenter;
 
-  const filteredSpots = useMemo(
-    () => filterSpotsByQuery(spots, activeQuery),
-    [activeQuery, spots]
-  );
+  useEffect(() => {
+    void fetchSpotsPayloadClient({
+      lat: origin.lat,
+      lng: origin.lng,
+      limit: MAP_SPOT_LIMIT,
+      q: activeQuery,
+    }).then((p) => {
+      setSpots(p.spots);
+      setMapCenter(p.defaultCenter);
+    });
+  }, [activeQuery, origin.lat, origin.lng]);
 
   const nearbySpots = useMemo(
     () =>
-      sortSpotsByDistanceFrom(filteredSpots, origin)
+      sortSpotsByDistanceFrom(spots, origin)
         .slice(0, MAP_SPOT_LIMIT)
         .map(({ spot }) => spot),
-    [filteredSpots, origin]
+    [spots, origin]
   );
 
   const listRows = useMemo(() => {

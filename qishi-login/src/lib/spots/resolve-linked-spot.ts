@@ -1,4 +1,3 @@
-import { getFallbackFishingSpotById } from "@/lib/geo/fishing-spots";
 import type { UserMarkedSpot } from "@/lib/spots/user-marked-spots";
 import { loadUserMarkedSpots } from "@/lib/spots/user-marked-spots";
 
@@ -15,8 +14,6 @@ export function resolveLinkedSpotName(
   if (u) return u.name;
   const fromApi = platformSpotNames?.[linkedSpotId];
   if (fromApi) return fromApi;
-  const o = getFallbackFishingSpotById(linkedSpotId);
-  if (o) return o.name;
   return linkedSpotId;
 }
 

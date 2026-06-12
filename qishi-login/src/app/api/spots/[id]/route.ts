@@ -1,4 +1,4 @@
-import { FALLBACK_FISHING_SPOTS } from "@/lib/geo/fishing-spots";
+import { FALLBACK_FISHING_SPOTS } from "@/lib/geo/fishing-spots-database";
 
 type Props = {
   params: Promise<{ id: string }>;

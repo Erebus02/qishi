@@ -1,10 +1,8 @@
 import type { Metadata } from "next";
 
 import { AdminDashboard } from "@/components/admin/admin-dashboard";
-import {
-  DEFAULT_MAP_CENTER,
-  FALLBACK_FISHING_SPOTS,
-} from "@/lib/geo/fishing-spots";
+import { DEFAULT_MAP_CENTER } from "@/lib/geo/fishing-spots";
+import { FALLBACK_FISHING_SPOTS } from "@/lib/geo/fishing-spots-database";
 
 export const metadata: Metadata = {
   title: "管理后台 · 起势",
