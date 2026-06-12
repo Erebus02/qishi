@@ -2,6 +2,7 @@
   WATER_SPOT_CATEGORIES,
   type WaterSpotCategory,
 } from "@/lib/geo/water-spot-category";
+import { CHINA_PROVINCE_CITIES } from "@/lib/geo/china-regions";
 import type { FishingSpot } from "@/lib/geo/fishing-spots";
 /** 人工精选钓点：作为全国钓点库的高质量头部数据 */
 const CURATED_FISHING_SPOTS: FishingSpot[] = [
@@ -850,61 +851,60 @@ type SeedCity = {
 
 const TARGET_SPOT_COUNT = 3000;
 
-const SEED_CITIES: SeedCity[] = [
-  { province: "北京", city: "北京", lat: 39.9042, lng: 116.4074 },
-  { province: "天津", city: "天津", lat: 39.3434, lng: 117.3616 },
-  { province: "上海", city: "上海", lat: 31.2304, lng: 121.4737 },
-  { province: "重庆", city: "重庆", lat: 29.563, lng: 106.5516 },
-  { province: "河北", city: "石家庄", lat: 38.0428, lng: 114.5149 },
-  { province: "河北", city: "承德", lat: 40.9529, lng: 117.9634 },
-  { province: "山西", city: "太原", lat: 37.8706, lng: 112.5489 },
-  { province: "山西", city: "运城", lat: 35.0267, lng: 111.0075 },
-  { province: "内蒙古", city: "呼和浩特", lat: 40.8426, lng: 111.7492 },
-  { province: "内蒙古", city: "赤峰", lat: 42.2586, lng: 118.8876 },
-  { province: "辽宁", city: "沈阳", lat: 41.8057, lng: 123.4315 },
-  { province: "辽宁", city: "大连", lat: 38.914, lng: 121.6147 },
-  { province: "吉林", city: "长春", lat: 43.8171, lng: 125.3235 },
-  { province: "吉林", city: "松原", lat: 45.1411, lng: 124.8251 },
-  { province: "黑龙江", city: "哈尔滨", lat: 45.8038, lng: 126.535 },
-  { province: "黑龙江", city: "牡丹江", lat: 44.5517, lng: 129.6332 },
-  { province: "江苏", city: "南京", lat: 32.0603, lng: 118.7969 },
-  { province: "江苏", city: "苏州", lat: 31.2989, lng: 120.5853 },
-  { province: "浙江", city: "杭州", lat: 30.2741, lng: 120.1551 },
-  { province: "浙江", city: "宁波", lat: 29.8683, lng: 121.544 },
-  { province: "安徽", city: "合肥", lat: 31.8206, lng: 117.2272 },
-  { province: "安徽", city: "六安", lat: 31.7337, lng: 116.5232 },
-  { province: "福建", city: "福州", lat: 26.0745, lng: 119.2965 },
-  { province: "福建", city: "厦门", lat: 24.4798, lng: 118.0894 },
-  { province: "江西", city: "南昌", lat: 28.682, lng: 115.8582 },
-  { province: "江西", city: "九江", lat: 29.7051, lng: 116.0019 },
-  { province: "山东", city: "济南", lat: 36.6512, lng: 117.1201 },
-  { province: "山东", city: "青岛", lat: 36.0671, lng: 120.3826 },
-  { province: "河南", city: "郑州", lat: 34.7466, lng: 113.6254 },
-  { province: "河南", city: "信阳", lat: 32.147, lng: 114.091 },
-  { province: "湖北", city: "武汉", lat: 30.5928, lng: 114.3055 },
-  { province: "湖北", city: "宜昌", lat: 30.6919, lng: 111.2865 },
-  { province: "湖南", city: "长沙", lat: 28.2282, lng: 112.9388 },
-  { province: "湖南", city: "岳阳", lat: 29.3571, lng: 113.1287 },
-  { province: "广东", city: "广州", lat: 23.1291, lng: 113.2644 },
-  { province: "广东", city: "深圳", lat: 22.5431, lng: 114.0579 },
-  { province: "广西", city: "南宁", lat: 22.817, lng: 108.3669 },
-  { province: "广西", city: "桂林", lat: 25.2736, lng: 110.2902 },
-  { province: "海南", city: "海口", lat: 20.0442, lng: 110.1999 },
-  { province: "海南", city: "三亚", lat: 18.2528, lng: 109.5119 },
-  { province: "四川", city: "成都", lat: 30.5728, lng: 104.0668 },
-  { province: "四川", city: "南充", lat: 30.8378, lng: 106.1107 },
-  { province: "贵州", city: "贵阳", lat: 26.647, lng: 106.6302 },
-  { province: "贵州", city: "兴义", lat: 25.092, lng: 104.8955 },
-  { province: "云南", city: "昆明", lat: 25.0389, lng: 102.7183 },
-  { province: "云南", city: "大理", lat: 25.6065, lng: 100.2676 },
-  { province: "西藏", city: "拉萨", lat: 29.652, lng: 91.1721 },
-  { province: "陕西", city: "西安", lat: 34.3416, lng: 108.9398 },
-  { province: "甘肃", city: "兰州", lat: 36.0611, lng: 103.8343 },
-  { province: "青海", city: "西宁", lat: 36.6171, lng: 101.7782 },
-  { province: "宁夏", city: "银川", lat: 38.4872, lng: 106.2309 },
-  { province: "新疆", city: "乌鲁木齐", lat: 43.8256, lng: 87.6168 },
-];
+const PROVINCE_CENTERS: Record<string, { lat: number; lng: number }> = {
+  北京市: { lat: 39.9042, lng: 116.4074 },
+  天津市: { lat: 39.3434, lng: 117.3616 },
+  上海市: { lat: 31.2304, lng: 121.4737 },
+  重庆市: { lat: 29.563, lng: 106.5516 },
+  河北省: { lat: 38.0428, lng: 114.5149 },
+  山西省: { lat: 37.8706, lng: 112.5489 },
+  辽宁省: { lat: 41.8057, lng: 123.4315 },
+  吉林省: { lat: 43.8171, lng: 125.3235 },
+  黑龙江省: { lat: 45.8038, lng: 126.535 },
+  江苏省: { lat: 32.0603, lng: 118.7969 },
+  浙江省: { lat: 30.2741, lng: 120.1551 },
+  安徽省: { lat: 31.8206, lng: 117.2272 },
+  福建省: { lat: 26.0745, lng: 119.2965 },
+  江西省: { lat: 28.682, lng: 115.8582 },
+  山东省: { lat: 36.6512, lng: 117.1201 },
+  河南省: { lat: 34.7466, lng: 113.6254 },
+  湖北省: { lat: 30.5928, lng: 114.3055 },
+  湖南省: { lat: 28.2282, lng: 112.9388 },
+  广东省: { lat: 23.1291, lng: 113.2644 },
+  广西壮族自治区: { lat: 22.817, lng: 108.3669 },
+  海南省: { lat: 20.0442, lng: 110.1999 },
+  四川省: { lat: 30.5728, lng: 104.0668 },
+  贵州省: { lat: 26.647, lng: 106.6302 },
+  云南省: { lat: 25.0389, lng: 102.7183 },
+  陕西省: { lat: 34.3416, lng: 108.9398 },
+  甘肃省: { lat: 36.0611, lng: 103.8343 },
+  青海省: { lat: 36.6171, lng: 101.7782 },
+  内蒙古自治区: { lat: 40.8426, lng: 111.7492 },
+  宁夏回族自治区: { lat: 38.4872, lng: 106.2309 },
+  新疆维吾尔自治区: { lat: 43.8256, lng: 87.6168 },
+  西藏自治区: { lat: 29.652, lng: 91.1721 },
+  香港特别行政区: { lat: 22.3193, lng: 114.1694 },
+  澳门特别行政区: { lat: 22.1987, lng: 113.5439 },
+  台湾省: { lat: 25.033, lng: 121.5654 },
+};
 
+function createSeedCities(): SeedCity[] {
+  return CHINA_PROVINCE_CITIES.flatMap((province, provinceIndex) => {
+    const center = PROVINCE_CENTERS[province.name] ?? { lat: 30.544, lng: 114.429 };
+    return province.cities.map((city, cityIndex) => {
+      const angle = seededNoise((provinceIndex + 1) * 97 + cityIndex * 13) * Math.PI * 2;
+      const radius = province.municipality ? 0.08 + cityIndex * 0.025 : 0.18 + (cityIndex % 6) * 0.11;
+      return {
+        province: province.name,
+        city,
+        lat: Number(clamp(center.lat + Math.sin(angle) * radius, 18.1, 53.5).toFixed(5)),
+        lng: Number(clamp(center.lng + Math.cos(angle) * radius, 73.5, 134.7).toFixed(5)),
+      };
+    });
+  });
+}
+
+const SEED_CITIES: SeedCity[] = createSeedCities();
 const CATEGORY_NAMES: Record<WaterSpotCategory, string[]> = {
   水库: ["水库", "库湾", "大坝湾", "深水湾", "上游湾"],
   湖泊: ["湖", "湿地", "浅滩", "湖湾", "亲水湾"],
@@ -931,7 +931,8 @@ function clamp(value: number, min: number, max: number) {
 function createGeneratedSpot(index: number): FishingSpot {
   const city = SEED_CITIES[index % SEED_CITIES.length];
   const categories = WATER_SPOT_CATEGORIES;
-  const waterCategory = categories[index % categories.length];
+  const cityRound = Math.floor(index / SEED_CITIES.length);
+  const waterCategory = categories[(cityRound + index) % categories.length];
   const nameParts = CATEGORY_NAMES[waterCategory];
   const fishOptions = CATEGORY_FISH[waterCategory];
   const angle = seededNoise(index + 11) * Math.PI * 2;
@@ -969,4 +970,5 @@ export const FALLBACK_FISHING_SPOTS: FishingSpot[] = [
 export function getFallbackFishingSpotById(id: string): FishingSpot | undefined {
   return FALLBACK_FISHING_SPOTS.find((s) => s.id === id);
 }
+
 
