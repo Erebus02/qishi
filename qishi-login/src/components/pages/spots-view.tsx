@@ -135,6 +135,43 @@ const spots: SpotListItem[] = [
 
 const USER_SPOT_LIST_IMAGE =
   "https://images.unsplash.com/photo-149378703840-e5412fc24978?w=200&h=150&fit=crop";
+const PLATFORM_SPOT_LIST_IMAGE =
+  "https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=200&h=150&fit=crop";
+
+function inferProvinceCity(region?: string): { province: string; city: string } {
+  const text = region ?? "";
+  for (const province of CHINA_PROVINCE_CITIES) {
+    if (text.includes(province.name)) {
+      const city = province.cities.find((item) => text.includes(item));
+      return { province: province.name, city: city ?? province.cities[0] ?? "" };
+    }
+    const city = province.cities.find((item) => text.includes(item));
+    if (city) return { province: province.name, city };
+  }
+  return { province: "湖北省", city: "武汉市" };
+}
+
+function platformSpotToListItem(spot: FishingSpot): SpotListItem {
+  const inferred = inferProvinceCity(spot.region);
+  return {
+    id: spot.id,
+    name: spot.name,
+    type: spot.waterCategory ?? "钓点",
+    waterCategory: spot.waterCategory,
+    distance: spot.distanceLabel ?? "—",
+    rating: spot.rating ?? null,
+    price: null,
+    tags: spot.fish
+      ? spot.fish
+          .split(/[、,，\s]+/)
+          .map((item) => item.trim())
+          .filter(Boolean)
+      : [],
+    image: PLATFORM_SPOT_LIST_IMAGE,
+    province: inferred.province,
+    city: inferred.city,
+  };
+}
 
 function buildSpotPageUrl(spotId: string): string {
   if (typeof window === "undefined") {
@@ -284,12 +321,17 @@ export function SpotsView() {
     return resolveSpotNavCoords(sharingSpot, userSpots, platformCoords);
   }, [sharingSpot, userSpots, platformCoords]);
 
+  const catalogSpotRows = useMemo((): SpotListItem[] => {
+    const rows = platformSpots.map(platformSpotToListItem);
+    return rows.length > 0 ? rows : spots;
+  }, [platformSpots]);
+
   const filteredSpots = useMemo(
     () =>
-      spots.filter((s) =>
+      catalogSpotRows.filter((s) =>
         spotMatchesRegion(s.province, s.city, region)
       ),
-    [region]
+    [catalogSpotRows, region]
   );
 
   const userSpotRows = useMemo((): SpotListItem[] => {

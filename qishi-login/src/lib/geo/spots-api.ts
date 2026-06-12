@@ -1,4 +1,5 @@
 import { apiUrl, apiBaseUrl } from "@/lib/api-base";
+import { readAdminSpotsPayload } from "@/lib/admin/admin-spots-storage";
 
 import {
   DEFAULT_MAP_CENTER,
@@ -64,6 +65,9 @@ export function getBackendBaseUrl(): string | undefined {
 
 /** 浏览器：未配置后端地址时使用本地静态兜底数据 */
 export async function fetchSpotsPayloadClient(): Promise<SpotsPayload> {
+  const adminPayload = readAdminSpotsPayload();
+  if (adminPayload) return adminPayload;
+
   if (!apiBaseUrl()) {
     return {
       spots: [...FALLBACK_FISHING_SPOTS],
@@ -126,6 +130,10 @@ export async function fetchSpotsPayloadServer(): Promise<SpotsPayload> {
 }
 
 export async function fetchSpotByIdClient(id: string): Promise<FishingSpot | null> {
+  const adminPayload = readAdminSpotsPayload();
+  const adminSpot = adminPayload?.spots.find((s) => s.id === id);
+  if (adminSpot) return adminSpot;
+
   if (!apiBaseUrl()) {
     return (
       FALLBACK_FISHING_SPOTS.find((s) => s.id === id) ?? null
