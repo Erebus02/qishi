@@ -9,8 +9,10 @@ import {
   type FishingSpot,
 } from "@/lib/geo/fishing-spots";
 import { buildAmapNavigationUrl } from "@/lib/geo/external-map-nav-links";
+import { haversineKm } from "@/lib/geo/haversine";
 import { openExternalMapUrl } from "@/lib/geo/open-external-map-url";
 import {
+  fetchDrivingRoute,
   straightLineRoute,
   type LatLng,
 } from "@/lib/geo/osrm-route";
@@ -26,7 +28,7 @@ import { LeafletViewport, type MapMarkerSpec } from "./leaflet-viewport";
 type RouteState =
   | { phase: "idle" }
   | { phase: "loading" }
-  | { phase: "ready"; points: LatLng[]; source: "straight" }
+  | { phase: "ready"; points: LatLng[]; source: "driving" | "straight" }
   | { phase: "error"; message: string };
 
 export function NavRouteClient({
@@ -76,11 +78,33 @@ export function NavRouteClient({
 
   const compute = useCallback(() => {
     if (!spot) return;
-    const origin = position ?? DEFAULT_MAP_CENTER;
-    setRoute({
-      phase: "ready",
-      points: straightLineRoute(origin, destination),
-      source: "straight",
+    if (!position) {
+      setRoute({
+        phase: "error",
+        message: "未获取到当前位置，暂不绘制路线。请授权定位后刷新，或直接打开高德导航。",
+      });
+      return;
+    }
+    const origin = position;
+    setRoute({ phase: "loading" });
+    void fetchDrivingRoute(origin, destination).then((points) => {
+      if (points && points.length >= 2) {
+        setRoute({ phase: "ready", points, source: "driving" });
+        return;
+      }
+      const distanceKm = haversineKm(origin, destination);
+      if (distanceKm <= 80) {
+        setRoute({
+          phase: "ready",
+          points: straightLineRoute(origin, destination),
+          source: "straight",
+        });
+        return;
+      }
+      setRoute({
+        phase: "error",
+        message: "路线服务暂不可用，且距离较远，已隐藏异常直线。请点击下方按钮打开高德地图导航。",
+      });
     });
   }, [destination, position, spot]);
 
@@ -161,7 +185,10 @@ export function NavRouteClient({
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold">导航至 {spot.name}</p>
           <p className="truncate text-[11px] text-white/70">
-            {route.phase === "ready" && "路线：高德驾车规划"}
+            {route.phase === "loading" && "路线规划中…"}
+            {route.phase === "ready" &&
+              (route.source === "driving" ? "路线：驾车规划" : "路线：短距离直线预览")}
+            {route.phase === "error" && route.message}
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
@@ -216,9 +243,9 @@ export function NavRouteClient({
         <p>
           定位状态：
           {status === "granted" && "已使用实时位置作为起点"}
-          {status === "denied" && "未授权：起点为默认区域中心，仍可查看示意线路"}
+          {status === "denied" && "未授权：不绘制假线路，可直接打开高德导航"}
           {status === "loading" && "定位中…"}
-          {status === "error" && "定位失败：已用默认起点"}
+          {status === "error" && "定位失败：不绘制假线路，可直接打开高德导航"}
         </p>
         <p className="text-white/60">
           当前页面用于路线预览；点击按钮后由高德地图提供实时语音导航。

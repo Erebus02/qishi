@@ -54,8 +54,14 @@ function spotMatchesRegion(
   r: RegionChoice
 ): boolean {
   if (r.scope === "nation") return true;
-  if (r.scope === "province") return province === r.province;
-  return province === r.province && city === r.city;
+  if (r.scope === "province") return looseRegionMatch(province, r.province);
+  return looseRegionMatch(province, r.province) && looseRegionMatch(city, r.city);
+}
+
+function looseRegionMatch(source: string, target: string) {
+  const a = source.replace(/[省市区县]/g, "");
+  const b = target.replace(/[省市区县]/g, "");
+  return source === target || a === b || source.includes(b) || target.includes(a);
 }
 
 /** 钓点列表行（平台 + 钓友标记）；水域分类与作钓记录、后台一致 */
@@ -139,11 +145,11 @@ const PLATFORM_SPOT_LIST_IMAGE =
 function inferProvinceCity(region?: string): { province: string; city: string } {
   const text = region ?? "";
   for (const province of CHINA_PROVINCE_CITIES) {
-    if (text.includes(province.name)) {
-      const city = province.cities.find((item) => text.includes(item));
+    if (looseRegionMatch(text, province.name)) {
+      const city = province.cities.find((item) => looseRegionMatch(text, item));
       return { province: province.name, city: city ?? province.cities[0] ?? "" };
     }
-    const city = province.cities.find((item) => text.includes(item));
+    const city = province.cities.find((item) => looseRegionMatch(text, item));
     if (city) return { province: province.name, city };
   }
   return { province: "湖北省", city: "武汉市" };
@@ -200,6 +206,7 @@ function resolveSpotNavCoords(
 export function SpotsView() {
   const [activeTab, setActiveTab] = useState<string>(tabs[0]);
   const [region, setRegion] = useState<RegionChoice>({ scope: "nation" });
+  const [query, setQuery] = useState("");
   const [regionOpen, setRegionOpen] = useState(false);
   const [pickerProvince, setPickerProvince] = useState<string | null>(null);
   const [sharingSpot, setSharingSpot] = useState<SpotListItem | null>(null);
@@ -241,10 +248,15 @@ export function SpotsView() {
   }, []);
 
   useEffect(() => {
-    void fetchSpotsPayloadClient({ limit: LIST_RENDER_LIMIT }).then((p) =>
-      setPlatformSpots(p.spots)
-    );
-  }, []);
+    const category = activeTab === tabs[0] ? undefined : activeTab;
+    void fetchSpotsPayloadClient({
+      limit: LIST_RENDER_LIMIT,
+      q: query,
+      province: region.scope === "nation" ? undefined : region.province,
+      city: region.scope === "city" ? region.city : undefined,
+      category,
+    }).then((p) => setPlatformSpots(p.spots));
+  }, [activeTab, query, region]);
 
   useEffect(() => {
     const onVis = () => {
@@ -474,6 +486,8 @@ export function SpotsView() {
           <input
             type="search"
             placeholder="搜索钓场名称钓点"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
             className="ml-2 min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-gray-400 dark:text-zinc-100"
           />
         </div>

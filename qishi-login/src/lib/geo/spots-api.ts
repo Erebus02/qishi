@@ -17,6 +17,9 @@ export type FetchSpotsOptions = {
   lng?: number;
   limit?: number;
   q?: string;
+  province?: string;
+  city?: string;
+  category?: string;
 };
 
 function normalizeSpot(raw: unknown): FishingSpot | null {
@@ -78,6 +81,9 @@ function buildSpotsPath(options?: FetchSpotsOptions) {
   }
   const q = options?.q?.trim();
   if (q) params.set("q", q);
+  if (options?.province) params.set("province", options.province);
+  if (options?.city) params.set("city", options.city);
+  if (options?.category) params.set("category", options.category);
   const qs = params.toString();
   return qs ? `/api/spots?${qs}` : "/api/spots";
 }

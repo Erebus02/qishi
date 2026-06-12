@@ -6,9 +6,19 @@ import {
 } from "@/lib/geo/fishing-spots-database";
 import { haversineKm } from "@/lib/geo/haversine";
 
+function looseIncludes(text: string | undefined, target: string | null) {
+  if (!target) return true;
+  const haystack = (text ?? "").replace(/[省市区县]/g, "");
+  const needle = target.replace(/[省市区县]/g, "");
+  return haystack.includes(needle) || (text ?? "").includes(target);
+}
+
 export function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const q = (searchParams.get("q") ?? "").trim().toLowerCase();
+  const province = searchParams.get("province");
+  const city = searchParams.get("city");
+  const category = searchParams.get("category");
   const limit = Math.min(
     3000,
     Math.max(1, Number(searchParams.get("limit") ?? 3000) || 3000)
@@ -33,6 +43,17 @@ export function GET(request: Request) {
         .toLowerCase();
       return parts.every((part) => blob.includes(part));
     });
+  }
+
+  if (province || city) {
+    rows = rows.filter(
+      (spot) =>
+        looseIncludes(spot.region, province) && looseIncludes(spot.region, city)
+    );
+  }
+
+  if (category) {
+    rows = rows.filter((spot) => spot.waterCategory === category);
   }
 
   if (hasOrigin) {
