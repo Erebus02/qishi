@@ -217,6 +217,7 @@ export function SpotsView() {
   const [userSpots, setUserSpots] = useState<UserMarkedSpot[]>([]);
   const [fishingRecords, setFishingRecords] = useState<FishingRecord[]>([]);
   const [platformSpots, setPlatformSpots] = useState<FishingSpot[]>([]);
+  const [categoryCounts, setCategoryCounts] = useState<Record<string, number>>({});
 
   const platformCoords = useMemo(
     () =>
@@ -255,7 +256,10 @@ export function SpotsView() {
       province: region.scope === "nation" ? undefined : region.province,
       city: region.scope === "city" ? region.city : undefined,
       category,
-    }).then((p) => setPlatformSpots(p.spots));
+    }).then((p) => {
+      setPlatformSpots(p.spots);
+      setCategoryCounts(p.categoryCounts ?? {});
+    });
   }, [activeTab, query, region]);
 
   useEffect(() => {
@@ -517,6 +521,11 @@ export function SpotsView() {
             )}
           >
             {tab}
+            {tab !== tabs[0] && categoryCounts[tab] ? (
+              <span className="ml-1 text-xs opacity-80">
+                {categoryCounts[tab]}
+              </span>
+            ) : null}
           </button>
         ))}
       </div>
@@ -629,7 +638,7 @@ export function SpotsView() {
           <p className="px-4 py-8 text-center text-sm text-gray-500 dark:text-zinc-500">
             {activeTab === tabs[0]
               ? "当前地区暂无钓点，请更换省/市或选择「全国」"
-              : `当前筛选下暂无「${activeTab}」类钓点`}
+              : `当前地区暂无「${activeTab}」类钓点，请切换其他水域类型或更换地区`}
           </p>
         ) : null}
         {visibleSpots.length > renderedSpots.length ? (

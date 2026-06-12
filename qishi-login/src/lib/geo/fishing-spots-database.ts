@@ -932,7 +932,7 @@ function createGeneratedSpot(index: number): FishingSpot {
   const city = SEED_CITIES[index % SEED_CITIES.length];
   const categories = WATER_SPOT_CATEGORIES;
   const cityRound = Math.floor(index / SEED_CITIES.length);
-  const waterCategory = categories[(cityRound + index) % categories.length];
+  const waterCategory = categories[cityRound % categories.length];
   const nameParts = CATEGORY_NAMES[waterCategory];
   const fishOptions = CATEGORY_FISH[waterCategory];
   const angle = seededNoise(index + 11) * Math.PI * 2;

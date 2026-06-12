@@ -52,6 +52,12 @@ export function GET(request: Request) {
     );
   }
 
+  const categoryCounts = rows.reduce<Record<string, number>>((acc, spot) => {
+    const key = spot.waterCategory ?? "未分类";
+    acc[key] = (acc[key] ?? 0) + 1;
+    return acc;
+  }, {});
+
   if (category) {
     rows = rows.filter((spot) => spot.waterCategory === category);
   }
@@ -70,6 +76,7 @@ export function GET(request: Request) {
     spots,
     total: FALLBACK_FISHING_SPOTS.length,
     matched: rows.length,
+    categoryCounts,
     limit,
   });
 }

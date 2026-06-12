@@ -10,6 +10,7 @@ import { isWaterSpotCategory } from "./water-spot-category";
 export type SpotsPayload = {
   spots: FishingSpot[];
   defaultCenter: { lat: number; lng: number };
+  categoryCounts?: Record<string, number>;
 };
 
 export type FetchSpotsOptions = {
@@ -62,7 +63,15 @@ function parseListPayload(json: unknown): SpotsPayload | null {
   ) {
     defaultCenter = { lat: dc.lat, lng: dc.lng };
   }
-  return { spots, defaultCenter };
+  const categoryCounts =
+    o.categoryCounts && typeof o.categoryCounts === "object"
+      ? Object.fromEntries(
+          Object.entries(o.categoryCounts as Record<string, unknown>)
+            .filter(([, value]) => typeof value === "number")
+            .map(([key, value]) => [key, value as number])
+        )
+      : undefined;
+  return { spots, defaultCenter, categoryCounts };
 }
 
 export function getBackendBaseUrl(): string | undefined {
