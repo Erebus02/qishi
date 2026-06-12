@@ -7,6 +7,8 @@ export type AuthUser = {
   phoneMasked?: string;
   accountMasked?: string;
   label?: string;
+  nickname?: string;
+  avatarUrl?: string;
 };
 
 export type AuthSession = {

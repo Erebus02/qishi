@@ -1222,14 +1222,22 @@ export function RecordsView() {
                       setFormSpotStars(5);
                       setFormCreateNewSpot(false);
                       const ps = platformSpots.find((p) => p.id === v);
-                      if (ps?.waterCategory) {
-                        setFormWaterCategory(ps.waterCategory);
+                      if (ps) {
+                        setFormLocation(ps.name);
+                        if (ps.waterCategory) {
+                          setFormWaterCategory(ps.waterCategory);
+                        }
                       } else {
                         const u = userSpotsForPicker.find((x) => x.id === v);
                         if (u?.waterCategory) {
                           setFormWaterCategory(u.waterCategory);
                         }
+                        if (u) {
+                          setFormLocation(u.name);
+                        }
                       }
+                    } else {
+                      setFormSpotStars(5);
                     }
                   }}
                   className="mb-2 w-full rounded-lg border border-gray-200 bg-white px-2 py-2 text-sm dark:border-white/15 dark:bg-zinc-950 dark:text-zinc-100"

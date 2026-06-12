@@ -12,6 +12,8 @@ export async function POST() {
     user: {
       loginType: "wechat" as const,
       label: "微信用户",
+      nickname: "微信钓友",
+      avatarUrl: "/icons/qishi-icon-192.png",
     },
   });
 }

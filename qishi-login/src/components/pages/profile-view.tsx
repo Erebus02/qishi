@@ -16,6 +16,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 
 import { aggregateStats, loadFishingRecords } from "@/lib/records/fishing-record-storage";
+import { loadAuthSession, type AuthSession } from "@/lib/auth/client-session";
 import {
   FAVORITES_CHANGED_EVENT,
   loadFavoriteSpotIds,
@@ -26,11 +27,13 @@ import { cn } from "@/lib/utils";
 export function ProfileView() {
   const [tripCount, setTripCount] = useState(0);
   const [favoriteCount, setFavoriteCount] = useState(0);
+  const [session, setSession] = useState<AuthSession | null>(null);
 
   useEffect(() => {
     const records = loadFishingRecords();
     setTripCount(aggregateStats(records).trips);
     setFavoriteCount(loadFavoriteSpotIds().length);
+    setSession(loadAuthSession());
   }, []);
 
   useEffect(() => {
@@ -47,6 +50,20 @@ export function ProfileView() {
     ],
     [tripCount, favoriteCount]
   );
+
+  const displayName =
+    session?.user.nickname ??
+    session?.user.label ??
+    session?.user.phoneMasked ??
+    session?.user.accountMasked ??
+    "钓鱼爱好者";
+  const displayId =
+    session?.user.loginType === "wechat"
+      ? "微信登录"
+      : session?.user.phoneMasked ?? session?.user.accountMasked ?? "ID: 1234567";
+  const avatarUrl =
+    session?.user.avatarUrl ??
+    "https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=200&h=200&fit=crop";
 
   const sections: {
     title: string;
@@ -126,16 +143,16 @@ export function ProfileView() {
           <div className="mb-6 flex items-center gap-4">
             <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-full border-2 border-white bg-white/20 backdrop-blur-sm">
               <Image
-                src="https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=200&h=200&fit=crop"
-                alt=""
+                src={avatarUrl}
+                alt={displayName}
                 fill
                 className="object-cover"
                 sizes="80px"
               />
             </div>
             <div>
-              <h2 className="mb-1 text-2xl font-bold">钓鱼爱好者</h2>
-              <p className="text-sm opacity-90">ID: 1234567</p>
+              <h2 className="mb-1 text-2xl font-bold">{displayName}</h2>
+              <p className="text-sm opacity-90">{displayId}</p>
             </div>
           </div>
 

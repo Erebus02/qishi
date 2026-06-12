@@ -43,7 +43,12 @@ export function LoginView() {
         const data = (await res.json()) as {
           error?: string;
           token?: string;
-          user?: { loginType: "wechat"; label?: string };
+          user?: {
+            loginType: "wechat";
+            label?: string;
+            nickname?: string;
+            avatarUrl?: string;
+          };
         };
         if (!res.ok || !data.token || !data.user) {
           setNotice(data.error ?? "微信登录失败，请稍后重试");
@@ -54,6 +59,8 @@ export function LoginView() {
           user: {
             loginType: "wechat",
             label: data.user.label,
+            nickname: data.user.nickname,
+            avatarUrl: data.user.avatarUrl,
           },
         });
         finishLogin();
