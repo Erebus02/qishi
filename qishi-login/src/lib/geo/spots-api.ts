@@ -1,4 +1,4 @@
-import { apiUrl, apiBaseUrl } from "@/lib/api-base";
+import { apiUrl } from "@/lib/api-base";
 import { readAdminSpotsPayload } from "@/lib/admin/admin-spots-storage";
 
 import {
@@ -68,12 +68,6 @@ export async function fetchSpotsPayloadClient(): Promise<SpotsPayload> {
   const adminPayload = readAdminSpotsPayload();
   if (adminPayload) return adminPayload;
 
-  if (!apiBaseUrl()) {
-    return {
-      spots: [...FALLBACK_FISHING_SPOTS],
-      defaultCenter: { ...DEFAULT_MAP_CENTER },
-    };
-  }
   try {
     const res = await fetch(apiUrl("/api/spots"), {
       cache: "no-store",
@@ -134,11 +128,6 @@ export async function fetchSpotByIdClient(id: string): Promise<FishingSpot | nul
   const adminSpot = adminPayload?.spots.find((s) => s.id === id);
   if (adminSpot) return adminSpot;
 
-  if (!apiBaseUrl()) {
-    return (
-      FALLBACK_FISHING_SPOTS.find((s) => s.id === id) ?? null
-    );
-  }
   try {
     const res = await fetch(apiUrl(`/api/spots/${encodeURIComponent(id)}`), {
       cache: "no-store",

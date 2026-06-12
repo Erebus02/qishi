@@ -148,6 +148,12 @@ function parseSpots(raw: string): FishingSpot[] | null {
   }
 }
 
+function mergeDefaultSpots(saved: FishingSpot[], defaults: FishingSpot[]) {
+  const savedIds = new Set(saved.map((spot) => spot.id));
+  const missingDefaults = defaults.filter((spot) => !savedIds.has(spot.id));
+  return missingDefaults.length > 0 ? [...saved, ...missingDefaults] : saved;
+}
+
 export function AdminDashboard({
   initialSpots,
   defaultCenter,
@@ -156,7 +162,17 @@ export function AdminDashboard({
     if (typeof window === "undefined") return initialSpots;
     const saved = window.localStorage.getItem(storageKey);
     const parsed = saved ? parseSpots(saved) : null;
-    return parsed && parsed.length > 0 ? parsed : initialSpots;
+    if (parsed && parsed.length > 0) {
+      const merged = mergeDefaultSpots(parsed, initialSpots);
+      if (merged.length !== parsed.length) {
+        window.localStorage.setItem(
+          storageKey,
+          JSON.stringify({ defaultCenter, spots: merged }, null, 2)
+        );
+      }
+      return merged;
+    }
+    return initialSpots;
   });
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState(allCategory);
