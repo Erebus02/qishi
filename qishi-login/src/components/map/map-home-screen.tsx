@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils";
 import { HomeMap } from "./home-map";
 
 const NEARBY_LIST_LIMIT = 8;
+const MAP_SPOT_LIMIT = 80;
 
 /**
  * 首页地图（mobile-first）
@@ -55,14 +56,16 @@ export function MapHomeScreen() {
     [activeQuery, spots]
   );
 
-  const visibleSpotIds = useMemo(() => {
-    const q = activeQuery.trim();
-    if (!q) return null;
-    return filteredSpots.map((s) => s.id);
-  }, [activeQuery, filteredSpots]);
+  const nearbySpots = useMemo(
+    () =>
+      sortSpotsByDistanceFrom(filteredSpots, origin)
+        .slice(0, MAP_SPOT_LIMIT)
+        .map(({ spot }) => spot),
+    [filteredSpots, origin]
+  );
 
   const listRows = useMemo(() => {
-    const sorted = sortSpotsByDistanceFrom(filteredSpots, origin).slice(
+    const sorted = sortSpotsByDistanceFrom(nearbySpots, origin).slice(
       0,
       NEARBY_LIST_LIMIT
     );
@@ -73,7 +76,7 @@ export function MapHomeScreen() {
       fish: spot.fish ?? "",
       rating: spot.rating,
     }));
-  }, [filteredSpots, origin]);
+  }, [nearbySpots, origin]);
 
   const runSearch = useCallback(() => {
     setActiveQuery(draftQuery.trim());
@@ -85,11 +88,11 @@ export function MapHomeScreen() {
     <div className="relative flex min-h-0 w-full flex-1 flex-col bg-gray-100 dark:bg-zinc-900">
       <div className="absolute inset-0 z-0 min-h-0 [&_.leaflet-control-zoom]:mb-[calc(var(--qishi-bottom-safe)+4rem)] max-[428px]:[&_.leaflet-control-zoom]:mb-[calc(var(--qishi-bottom-safe)+5.5rem)]">
         <HomeMap
-          spots={spots}
+          spots={nearbySpots}
           userPosition={geo.position}
           geoStatus={geo.status}
           geoMessage={geo.message}
-          visibleSpotIds={visibleSpotIds}
+          visibleSpotIds={null}
         />
       </div>
 

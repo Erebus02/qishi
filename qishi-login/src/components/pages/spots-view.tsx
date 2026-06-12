@@ -38,6 +38,7 @@ import {
 import { cn } from "@/lib/utils";
 
 const tabs = ["附近钓点", "水库", "湖泊", "江河", "黑坑"] as const;
+const LIST_RENDER_LIMIT = 120;
 
 type RegionChoice =
   | { scope: "nation" }
@@ -402,6 +403,11 @@ export function SpotsView() {
     });
   }, [combinedSpots, activeTab]);
 
+  const renderedSpots = useMemo(
+    () => visibleSpots.slice(0, LIST_RENDER_LIMIT),
+    [visibleSpots]
+  );
+
   const openPicker = useCallback(() => {
     setPickerProvince(
       region.scope === "nation" ? null : region.province
@@ -615,7 +621,12 @@ export function SpotsView() {
               : `当前筛选下暂无「${activeTab}」类钓点`}
           </p>
         ) : null}
-        {visibleSpots.map((spot) => (
+        {visibleSpots.length > renderedSpots.length ? (
+          <p className="px-4 pb-1 pt-3 text-xs text-gray-500 dark:text-zinc-500">
+            已从 {visibleSpots.length} 个结果中优先显示前 {renderedSpots.length} 个，请选择省市或搜索关键词进一步缩小范围。
+          </p>
+        ) : null}
+        {renderedSpots.map((spot) => (
           <div
             key={spot.id}
             className="flex gap-3 border-b border-gray-100 p-4 dark:border-white/10"
