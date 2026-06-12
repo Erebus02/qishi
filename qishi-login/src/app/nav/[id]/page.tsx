@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
 
 import { NavRouteDynamic } from "@/components/map/nav-route-dynamic";
 import { fetchSpotByIdServer } from "@/lib/geo/spots-api";
@@ -19,7 +18,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function NavPage({ params, searchParams }: Props) {
   const { id } = await params;
   const spot = await fetchSpotByIdServer(id);
-  if (!spot) notFound();
   const sp = await searchParams;
   const returnTab = parseReturnTab(sp.from);
   return (

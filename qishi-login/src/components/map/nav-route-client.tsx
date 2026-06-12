@@ -44,15 +44,21 @@ export function NavRouteClient({
   const mainMapHref = "/map";
 
   const [spot, setSpot] = useState<FishingSpot | null>(initialSpot ?? null);
+  const [resolved, setResolved] = useState(Boolean(initialSpot));
 
   useEffect(() => {
     if (initialSpot?.id === spotId) {
       setSpot(initialSpot);
+      setResolved(true);
       return;
     }
+    setResolved(false);
     let cancelled = false;
     void fetchSpotByIdClient(spotId).then((s) => {
-      if (!cancelled) setSpot(s);
+      if (!cancelled) {
+        setSpot(s);
+        setResolved(true);
+      }
     });
     return () => {
       cancelled = true;
@@ -110,11 +116,31 @@ export function NavRouteClient({
     );
   }, [destination.lat, destination.lng, destinationName]);
 
-  if (!spot) {
+  if (!resolved) {
     return (
       <div className="flex h-dvh flex-col items-center justify-center gap-2 bg-zinc-950 text-white">
         <Loader2 className="size-8 animate-spin" aria-hidden />
         <p className="text-sm text-white/80">加载钓点…</p>
+      </div>
+    );
+  }
+
+  if (!spot) {
+    return (
+      <div className="flex h-dvh flex-col items-center justify-center gap-4 bg-zinc-950 px-6 text-center text-white">
+        <p className="text-base font-semibold">没有找到这个钓点</p>
+        <p className="text-sm text-white/70">
+          如果这是后台刚新增的钓点，请回到后台确认已保存，并在同一浏览器中打开。
+        </p>
+        <Link
+          href={mainMapHref}
+          className={cn(
+            "rounded-full bg-white px-5 py-2 text-sm font-semibold text-zinc-950",
+            loginFocusRing()
+          )}
+        >
+          返回地图首页
+        </Link>
       </div>
     );
   }
