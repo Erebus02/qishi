@@ -14,15 +14,21 @@
   "categories": ["lifestyle", "sports"],
   "icons": [
     {
-      "src": "/icons/pwa-icon-512.svg",
-      "sizes": "512x512",
-      "type": "image/svg+xml",
+      "src": "/icons/qishi-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/icons/pwa-icon-maskable.svg",
+      "src": "/icons/qishi-icon-512.png",
       "sizes": "512x512",
-      "type": "image/svg+xml",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/qishi-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
       "purpose": "maskable"
     }
   ]

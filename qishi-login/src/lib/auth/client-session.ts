@@ -3,7 +3,7 @@
 const KEY = "qishi-auth-session";
 
 export type AuthUser = {
-  loginType: "sms" | "password" | "device";
+  loginType: "sms" | "password" | "device" | "wechat";
   phoneMasked?: string;
   accountMasked?: string;
   label?: string;

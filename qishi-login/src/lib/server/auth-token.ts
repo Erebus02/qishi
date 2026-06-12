@@ -2,7 +2,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 
 export type AuthTokenPayload = {
   /** 登录方式 */
-  login: "sms" | "password" | "device";
+  login: "sms" | "password" | "device" | "wechat";
   /** 规范化账号（可为手机号） */
   sub?: string;
   exp: number;
