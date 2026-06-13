@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 import { NavRouteDynamic } from "@/components/map/nav-route-dynamic";
-import { fetchSpotByIdServer } from "@/lib/geo/spots-api";
+import { fetchSpotByIdServer } from "@/lib/geo/spots-api-server";
 import { parseReturnTab } from "@/lib/navigation/return-tab";
 
 type Props = {

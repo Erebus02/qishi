@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import Link from "next/link";
 import {
   Activity,
   BarChart3,
   ChevronRight,
+  Clock3,
   Database,
   Download,
   Fish,
@@ -30,6 +31,14 @@ import {
   isWaterSpotCategory,
   WATER_SPOT_CATEGORIES,
 } from "@/lib/geo/water-spot-category";
+import {
+  clearPageStayEntries,
+  formatStayDuration,
+  formatStayTime,
+  loadPageStayEntries,
+  summarizePageStay,
+  type PageStayEntry,
+} from "@/lib/analytics/page-stay-storage";
 
 import styles from "./admin-dashboard.module.css";
 
@@ -179,6 +188,7 @@ export function AdminDashboard({
   const [importText, setImportText] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [pageStayEntries, setPageStayEntries] = useState<PageStayEntry[]>([]);
   const [form, setForm] = useState<SpotFormState>(() => ({
     ...emptyForm,
     id: createNextId(initialSpots),
@@ -187,6 +197,15 @@ export function AdminDashboard({
   }));
 
   const isEditing = editingId != null;
+
+  useEffect(() => {
+    setPageStayEntries(loadPageStayEntries());
+  }, []);
+
+  const pageStaySummary = useMemo(
+    () => summarizePageStay(pageStayEntries),
+    [pageStayEntries]
+  );
 
   const categories = useMemo(() => {
     return [
@@ -292,6 +311,19 @@ export function AdminDashboard({
       tone: "violet",
     },
   ];
+
+  const refreshPageStay = () => {
+    setPageStayEntries(loadPageStayEntries());
+    setNotice("已刷新用户页面停留数据。");
+  };
+
+  const clearPageStay = () => {
+    const confirmed = window.confirm("确认清空当前浏览器记录的用户页面停留数据吗？");
+    if (!confirmed) return;
+    clearPageStayEntries();
+    setPageStayEntries([]);
+    setNotice("已清空用户页面停留数据。");
+  };
 
   const persist = (next: FishingSpot[], message: string) => {
     setSpots(next);
@@ -454,6 +486,10 @@ export function AdminDashboard({
             <MapPin size={18} />
             钓点数据
           </a>
+          <a href="#analytics">
+            <Clock3 size={18} />
+            用户停留
+          </a>
           <a href="#tools">
             <Database size={18} />
             数据工具
@@ -499,6 +535,90 @@ export function AdminDashboard({
               </div>
             </article>
           ))}
+        </section>
+
+        <section id="analytics" className={`${styles.panel} ${styles.analyticsPanel}`}>
+          <div className={styles.panelHeader}>
+            <div>
+              <h2>用户页面停留</h2>
+              <p>统计当前浏览器内用户访问各页面的停留时间，用于判断核心页面使用深度。</p>
+            </div>
+            <div className={styles.topActions}>
+              <button className={styles.secondaryButton} onClick={refreshPageStay}>
+                <RefreshCcw size={16} />
+                刷新
+              </button>
+              <button className={styles.ghostButton} onClick={clearPageStay}>
+                <Trash2 size={16} />
+                清空记录
+              </button>
+            </div>
+          </div>
+
+          <div className={styles.analyticsStats}>
+            <article>
+              <span>总停留</span>
+              <strong>{formatStayDuration(pageStaySummary.totalMs)}</strong>
+            </article>
+            <article>
+              <span>访问次数</span>
+              <strong>{pageStaySummary.totalVisits}</strong>
+            </article>
+            <article>
+              <span>平均停留</span>
+              <strong>{formatStayDuration(pageStaySummary.avgMs)}</strong>
+            </article>
+            <article>
+              <span>覆盖页面</span>
+              <strong>{pageStaySummary.pages.length}</strong>
+            </article>
+          </div>
+
+          <div className={styles.analyticsGrid}>
+            <div className={styles.analyticsBlock}>
+              <h3>页面排行</h3>
+              {pageStaySummary.pages.length > 0 ? (
+                <div className={styles.analyticsRows}>
+                  {pageStaySummary.pages.slice(0, 8).map((row) => (
+                    <div className={styles.analyticsRow} key={row.path}>
+                      <div>
+                        <strong>{row.title}</strong>
+                        <span>{row.path}</span>
+                      </div>
+                      <b>{formatStayDuration(row.totalMs)}</b>
+                      <em>{row.visits} 次</em>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className={styles.emptyAnalytics}>
+                  暂无数据。打开前台页面停留 1 秒以上，再回到后台刷新即可看到记录。
+                </p>
+              )}
+            </div>
+
+            <div className={styles.analyticsBlock}>
+              <h3>最近明细</h3>
+              {pageStaySummary.entries.length > 0 ? (
+                <div className={styles.analyticsRows}>
+                  {pageStaySummary.entries.slice(0, 8).map((entry) => (
+                    <div className={styles.analyticsRow} key={entry.id}>
+                      <div>
+                        <strong>{entry.title}</strong>
+                        <span>
+                          {entry.userLabel ?? "匿名用户"} · {formatStayTime(entry.endAt)}
+                        </span>
+                      </div>
+                      <b>{formatStayDuration(entry.durationMs)}</b>
+                      <em>{entry.path}</em>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className={styles.emptyAnalytics}>暂无访问明细。</p>
+              )}
+            </div>
+          </div>
         </section>
 
         <section className={styles.mainGrid}>

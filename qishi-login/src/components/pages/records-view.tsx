@@ -26,6 +26,7 @@ import {
 } from "@/components/poster/poster-editor-modal";
 import { nextRouteApi } from "@/lib/api-base";
 import type { FishingSpot } from "@/lib/geo/fishing-spots";
+import { haversineKm } from "@/lib/geo/haversine";
 import { fetchSpotsPayloadClient } from "@/lib/geo/spots-api";
 import { reverseGeocodeLabel } from "@/lib/geo/reverse-geocode";
 import {
@@ -63,6 +64,7 @@ import {
   remainingUserSpotQuotaToday,
   type UserMarkedSpot,
 } from "@/lib/spots/user-marked-spots";
+import { shouldUseNativeShare } from "@/lib/share/native-share";
 import { loginFocusRing } from "@/lib/login-styles";
 import { cn } from "@/lib/utils";
 
@@ -113,6 +115,11 @@ function formatDateTime(iso: string): string {
 
 /** 左滑露出的操作区总宽度（删除 + 分享） */
 const SWIPE_ACTION_W = 144;
+const GPS_NEARBY_SPOT_MAX_KM = 3;
+
+function coordinateLabel(latitude: number, longitude: number): string {
+  return `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
+}
 
 function buildRecordSharePayload(
   r: FishingRecord,
@@ -276,15 +283,46 @@ export function RecordsView() {
 
   const applyCoordsToLocationField = useCallback(
     async (latitude: number, longitude: number) => {
+      const coords = coordinateLabel(latitude, longitude);
+      setNewSpotLat(latitude);
+      setNewSpotLng(longitude);
+
+      try {
+        const nearby = await fetchSpotsPayloadClient({
+          lat: latitude,
+          lng: longitude,
+          limit: 1,
+        });
+        const nearest = nearby.spots[0];
+        if (nearest) {
+          const distanceKm = haversineKm(
+            { lat: latitude, lng: longitude },
+            { lat: nearest.lat, lng: nearest.lng }
+          );
+          if (distanceKm <= GPS_NEARBY_SPOT_MAX_KM) {
+            setFormLocation(nearest.name);
+            if (nearest.waterCategory) setFormWaterCategory(nearest.waterCategory);
+            setFormLinkedSpotId(nearest.id);
+            setLocateHint(`已匹配附近钓点，坐标 ${coords}`);
+            return;
+          }
+        }
+      } catch {
+        /* 继续走逆地理兜底 */
+      }
+
       try {
         const label = await reverseGeocodeLabel(latitude, longitude);
+        if (/^-?\d+(\.\d+)?°?[NS]?,?\s*-?\d+(\.\d+)?°?[EW]?$/i.test(label)) {
+          setFormLocation("当前位置附近钓点");
+          setLocateHint(`逆地理未返回地点名，已保留坐标 ${coords}，可手动改成钓点名称`);
+          return;
+        }
         setFormLocation(label);
-        setLocateHint(null);
+        setLocateHint(`已定位，坐标 ${coords}`);
       } catch {
-        setFormLocation(
-          `${latitude.toFixed(5)}, ${longitude.toFixed(5)}（逆地理失败，可手动修改）`
-        );
-        setLocateHint("已填入坐标，建议手动改成钓点名称");
+        setFormLocation("当前位置附近钓点");
+        setLocateHint(`逆地理失败，已保留坐标 ${coords}，请手动改成钓点名称`);
       }
     },
     []
@@ -763,7 +801,10 @@ export function RecordsView() {
         userSpotsForPicker,
         platformSpotNames
       );
-      if (typeof navigator.share === "function") {
+      if (
+        shouldUseNativeShare() &&
+        typeof navigator.share === "function"
+      ) {
         try {
           await navigator.share({ title, text, url });
           setSharingRecord(null);

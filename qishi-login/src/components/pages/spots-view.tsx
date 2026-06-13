@@ -32,6 +32,7 @@ import {
   loadUserMarkedSpots,
   type UserMarkedSpot,
 } from "@/lib/spots/user-marked-spots";
+import { shouldUseNativeShare } from "@/lib/share/native-share";
 import { cn } from "@/lib/utils";
 
 const tabs = ["附近钓点", "水库", "湖泊", "江河", "黑坑"] as const;
@@ -277,7 +278,10 @@ export function SpotsView() {
     async (spot: SpotListItem) => {
       const url = buildSpotPageUrl(spot.id);
       const text = `推荐钓点：${spot.name}`;
-      if (typeof navigator.share === "function") {
+      if (
+        shouldUseNativeShare() &&
+        typeof navigator.share === "function"
+      ) {
         try {
           await navigator.share({
             title: spot.name,

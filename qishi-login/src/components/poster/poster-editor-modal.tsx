@@ -19,6 +19,7 @@ import {
 import { dataUrlToJpegThumb } from "@/lib/poster/thumbnail-data-url";
 import { downloadDataUrl } from "@/lib/records/photo-fish-label";
 import type { FishingRecord } from "@/lib/records/fishing-record-storage";
+import { shouldUseNativeShare } from "@/lib/share/native-share";
 import { loginFocusRing } from "@/lib/login-styles";
 import { cn } from "@/lib/utils";
 
@@ -300,7 +301,8 @@ export function PosterEditorModal({
         dataUrl,
         `起势海报-${record.id.slice(0, 8)}.png`
       );
-      let canFileShare = typeof navigator.share === "function";
+      let canFileShare =
+        shouldUseNativeShare() && typeof navigator.share === "function";
       if (canFileShare && typeof navigator.canShare === "function") {
         try {
           canFileShare = navigator.canShare({ files: [file] });

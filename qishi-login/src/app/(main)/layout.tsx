@@ -1,4 +1,6 @@
 import { BottomNav } from "@/components/app/bottom-nav";
+import { AuthGate } from "@/components/auth/auth-gate";
+import { PageStayTracker } from "@/components/analytics/page-stay-tracker";
 
 /**
  * 主 Tab 壳：内容区占满视口；底栏 fixed，地图等全屏层需自行用 --qishi-bottom-safe 避开遮挡。
@@ -10,11 +12,14 @@ export default function MainTabLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex h-dvh min-h-0 flex-col bg-background">
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden overscroll-y-contain">
-        {children}
+    <AuthGate>
+      <PageStayTracker />
+      <div className="flex h-dvh min-h-0 flex-col bg-background">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden overscroll-y-contain">
+          {children}
+        </div>
+        <BottomNav />
       </div>
-      <BottomNav />
-    </div>
+    </AuthGate>
   );
 }

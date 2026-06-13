@@ -273,6 +273,118 @@
   margin-top: 18px;
 }
 
+.analyticsPanel {
+  margin-top: 18px;
+}
+
+.analyticsStats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  padding: 18px 20px 0;
+}
+
+.analyticsStats article {
+  padding: 16px;
+  border: 1px solid #e7eef8;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #f8fbff 0%, #fff 100%);
+}
+
+.analyticsStats span,
+.analyticsStats strong {
+  display: block;
+}
+
+.analyticsStats span {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.analyticsStats strong {
+  margin-top: 8px;
+  color: #102033;
+  font-size: 24px;
+  line-height: 1;
+}
+
+.analyticsGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  padding: 18px 20px 20px;
+}
+
+.analyticsBlock {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid #edf2f7;
+  border-radius: 18px;
+  background: #fff;
+}
+
+.analyticsBlock h3 {
+  margin: 0 0 12px;
+  color: #102033;
+  font-size: 15px;
+}
+
+.analyticsRows {
+  display: grid;
+  gap: 10px;
+}
+
+.analyticsRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 14px;
+  background: #f8fbff;
+}
+
+.analyticsRow strong,
+.analyticsRow span {
+  display: block;
+  min-width: 0;
+}
+
+.analyticsRow strong {
+  overflow: hidden;
+  color: #102033;
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.analyticsRow span,
+.analyticsRow em {
+  overflow: hidden;
+  color: #8a9aae;
+  font-size: 12px;
+  font-style: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.analyticsRow b {
+  color: #0f6fff;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.emptyAnalytics {
+  margin: 0;
+  padding: 20px;
+  border-radius: 14px;
+  color: #64748b;
+  background: #f8fbff;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
 .panel {
   min-width: 0;
   border: 1px solid rgba(148, 163, 184, 0.2);
@@ -646,7 +758,8 @@
   }
 
   .mainGrid,
-  .statsGrid {
+  .statsGrid,
+  .analyticsGrid {
     grid-template-columns: 1fr 1fr;
   }
 
@@ -683,8 +796,15 @@
 
   .statsGrid,
   .mainGrid,
+  .analyticsStats,
+  .analyticsGrid,
   .formGrid {
     grid-template-columns: 1fr;
+  }
+
+  .analyticsRow {
+    grid-template-columns: 1fr;
+    align-items: start;
   }
 
   .formActions {
