@@ -14,10 +14,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "ModelFlow｜SolidWorks 设备建模管理平台",
-  description: "集中管理设备、SolidWorks 模型、版本、BOM、审批和权限。",
-  other: {
-    "codex-preview": "development",
-  },
+  description: "集中管理设备、SolidWorks 模型、版本、变更审批、BOM 与执行任务。",
   icons: {
     icon: "/favicon.svg",
     shortcut: "/favicon.svg",
@@ -31,9 +28,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="zh-CN">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         {children}
       </body>
     </html>

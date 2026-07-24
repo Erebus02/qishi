@@ -91,7 +91,7 @@ function AppIcon({ children }: { children: React.ReactNode }) {
 export default function DashboardClient({ initialData }: { initialData: BootstrapData }) {
   const [devices, setDevices] = useState<Device[]>(initialData.devices);
   const [metrics, setMetrics] = useState(initialData.metrics);
-  const [activeNav, setActiveNav] = useState<NavKey>("devices");
+  const [activeNav, setActiveNav] = useState<NavKey>("dashboard");
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("全部状态");
   const [view, setView] = useState<"list" | "grid">("list");
@@ -277,7 +277,7 @@ export default function DashboardClient({ initialData }: { initialData: Bootstra
               metrics={metrics}
             />
           ) : (
-            <SectionView active={activeNav} devices={devices} onDevice={(device) => setSelected(device)} notify={notify} canApprove={can("change.approve")} />
+            <SectionView active={activeNav} devices={devices} metrics={metrics} onDevice={(device) => setSelected(device)} onNavigate={setActiveNav} onNewDevice={() => setShowNewDevice(true)} notify={notify} canApprove={can("change.approve")} canCreate={can("device.create")} />
           )}
         </div>
       </section>
@@ -466,8 +466,8 @@ function nextVersion(version: string) { const [major, minor] = version.replace("
 function downloadText(filename: string, content: string) { const url = URL.createObjectURL(new Blob([content], { type: "text/plain;charset=utf-8" })); const anchor = document.createElement("a"); anchor.href = url; anchor.download = filename; anchor.click(); window.setTimeout(() => URL.revokeObjectURL(url), 1000); }
 function exportDevices(rows: Device[]) { downloadText(`ModelFlow设备清单-${new Date().toISOString().slice(0, 10)}.csv`, "设备编号,设备名称,当前版本,状态,所属项目,负责人,更新时间\n" + rows.map((d) => [d.code,d.name,d.version,d.status,d.project,d.owner,d.updated].map((v) => `\"${String(v).replaceAll('"','""')}\"`).join(",")).join("\n")); }
 
-function SectionView({ active, devices: currentDevices, onDevice, notify, canApprove }: { active: NavKey; devices: Device[]; onDevice: (device: Device) => void; notify: (message: string) => void; canApprove: boolean }) {
-  if (active === "dashboard") return <Dashboard devices={currentDevices} onDevice={onDevice} />;
+function SectionView({ active, devices: currentDevices, metrics, onDevice, onNavigate, onNewDevice, notify, canApprove, canCreate }: { active: NavKey; devices: Device[]; metrics: BootstrapData["metrics"]; onDevice: (device: Device) => void; onNavigate: (key: NavKey) => void; onNewDevice: () => void; notify: (message: string) => void; canApprove: boolean; canCreate: boolean }) {
+  if (active === "dashboard") return <Dashboard devices={currentDevices} metrics={metrics} onDevice={onDevice} onNavigate={onNavigate} onNewDevice={onNewDevice} canCreate={canCreate} />;
   if (active === "versions") return <VersionCenter devices={currentDevices} onDevice={onDevice} notify={notify} />;
   if (active === "changes") return <ChangeOrderCenter devices={currentDevices} notify={notify} canApprove={canApprove} />;
   if (active === "permissions") return <PermissionCenter notify={notify} />;
@@ -549,7 +549,26 @@ function ChangeOrderModal({ devices, onClose, onSubmitted }: { devices: Device[]
 
 function changeStatusLabel(status: string) { return ({ draft: "草稿", submitted: "待审批", approved: "已批准", rejected: "已驳回", implemented: "已实施" } as Record<string, string>)[status] || status; }
 
-function Dashboard({ devices, onDevice }: { devices: Device[]; onDevice: (device: Device) => void }) { return <div className="dashboard-grid"><section className="dashboard-hero"><div><span>本周研发概览</span><h2>设备资料保持健康</h2><p>已完成 26 个版本任务，整体资料完整度较上周提升 4.8%。</p>{devices[0] && <button onClick={() => onDevice(devices[0])}>查看重点设备 <ChevronRight size={16} /></button>}</div><div className="health-score"><strong>92</strong><span>健康评分</span></div></section><section className="dashboard-card"><h3>我的待办</h3>{["检包自动装盘机 V3.1 待补充测试报告", "磁钢自动粘胶线 V1.2 待提交审核", "氢破炉 19 号缩略图任务已完成"].map((x, i) => <p key={x}><i>{i + 1}</i>{x}<ChevronRight size={15} /></p>)}</section><section className="dashboard-card wide"><h3>最近更新设备</h3>{devices.slice(0,3).map(d => <button key={d.id} onClick={() => onDevice(d)}><img src={d.image} alt="" /><span><b>{d.name}</b><small>{d.change}</small></span><em>{d.version}</em><ChevronRight /></button>)}</section><section className="dashboard-card activity-chart"><h3>近 7 日版本活动</h3><div>{[42,66,48,84,58,92,72].map((h,i)=><i key={i} style={{height:`${h}%`}}><span>{h}</span></i>)}</div><footer><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></footer></section></div>; }
+function Dashboard({ devices, metrics, onDevice, onNavigate, onNewDevice, canCreate }: { devices: Device[]; metrics: BootstrapData["metrics"]; onDevice: (device: Device) => void; onNavigate: (key: NavKey) => void; onNewDevice: () => void; canCreate: boolean }) {
+  const pending = devices.filter((device) => device.status !== "已发布");
+  return <div className="user-dashboard">
+    <section className="welcome-panel">
+      <div><span className="welcome-kicker">今日工作台</span><h2>先处理最重要的设备任务</h2><p>设备、版本和审批集中在一个工作区。你可以从下面的快捷入口开始，也可以直接继续最近的工作。</p></div>
+      <div className="welcome-stats"><span><b>{metrics.devices}</b>设备</span><span><b>{metrics.pendingApproval}</b>待审批</span><span><b>{metrics.published}</b>已发布</span></div>
+    </section>
+    <section className="quick-start" aria-label="快捷操作">
+      <header><div><span>快捷开始</span><h3>你今天想完成什么？</h3></div><small>选择一个任务即可进入对应流程</small></header>
+      <div>
+        {canCreate && <button onClick={onNewDevice}><i className="quick-blue"><Plus /></i><span><b>新建设备</b><small>录入设备基础资料和负责人</small></span><ChevronRight /></button>}
+        <button onClick={() => onNavigate("models")}><i className="quick-teal"><Upload /></i><span><b>上传模型</b><small>添加 SolidWorks 模型或工程图</small></span><ChevronRight /></button>
+        <button onClick={() => onNavigate("changes")}><i className="quick-purple"><FilePenLine /></i><span><b>发起变更</b><small>选择设备并提交变更申请</small></span><ChevronRight /></button>
+        <button onClick={() => onNavigate("approvals")}><i className="quick-orange"><ClipboardCheck /></i><span><b>处理审批</b><small>{metrics.pendingApproval ? `${metrics.pendingApproval} 项等待处理` : "当前没有待审批任务"}</small></span><ChevronRight /></button>
+      </div>
+    </section>
+    <section className="dashboard-card recent-work"><header><div><span>继续工作</span><h3>最近更新的设备</h3></div><button onClick={() => onNavigate("devices")}>查看全部 <ChevronRight size={15}/></button></header>{devices.slice(0,4).map(d => <button key={d.id} onClick={() => onDevice(d)}><img src={d.image} alt="" /><span><b>{d.name}</b><small>{d.change}</small></span><StatusTag status={d.status}/><em>{d.version}</em><ChevronRight /></button>)}</section>
+    <section className="dashboard-card pending-work"><header><div><span>需要关注</span><h3>待处理事项</h3></div></header>{pending.length ? pending.slice(0,4).map((d, index) => <button key={d.id} onClick={() => onDevice(d)}><i>{index + 1}</i><span><b>{d.name}</b><small>{d.status} · {d.owner}</small></span><ChevronRight /></button>) : <div className="all-clear"><CheckCircle2/><b>当前事项已处理完毕</b><span>可以继续维护设备资料或创建新版本。</span></div>}</section>
+  </div>;
+}
 
 function VersionCenter({ devices, onDevice, notify }: { devices: Device[]; onDevice: (device: Device) => void; notify: (message: string) => void }) { return <section className="content-card"><div className="section-toolbar"><label><Search size={17}/><input placeholder="搜索设备或版本" /></label><button onClick={() => notify("可直接输入设备名称或版本号筛选，点击结果查看详情")}><Filter size={16}/>筛选说明</button></div><div className="simple-table version-table"><div><b>设备</b><b>版本</b><b>基准版本</b><b>状态</b><b>更新摘要</b><b>更新时间</b></div>{devices.map((d,i)=><button key={d.id} onClick={()=>onDevice(d)}><span><img src={d.image} alt=""/><strong>{d.name}</strong></span><b>{d.version}</b><span>{i===0?"V2.2":"上一版本"}</span><StatusTag status={d.status}/><span>{d.change}</span><span>{d.updated}</span></button>)}</div></section>; }
 
