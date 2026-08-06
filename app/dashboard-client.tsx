@@ -466,7 +466,10 @@ function nextVersion(version: string) { const [major, minor] = version.replace("
 function downloadText(filename: string, content: string) { const url = URL.createObjectURL(new Blob([content], { type: "text/plain;charset=utf-8" })); const anchor = document.createElement("a"); anchor.href = url; anchor.download = filename; anchor.click(); window.setTimeout(() => URL.revokeObjectURL(url), 1000); }
 function exportDevices(rows: Device[]) { downloadText(`ModelFlow设备清单-${new Date().toISOString().slice(0, 10)}.csv`, "设备编号,设备名称,当前版本,状态,所属项目,负责人,更新时间\n" + rows.map((d) => [d.code,d.name,d.version,d.status,d.project,d.owner,d.updated].map((v) => `\"${String(v).replaceAll('"','""')}\"`).join(",")).join("\n")); }
 
+let devices: Device[] = [];
+
 function SectionView({ active, devices: currentDevices, metrics, onDevice, onNavigate, onNewDevice, notify, canApprove, canCreate }: { active: NavKey; devices: Device[]; metrics: BootstrapData["metrics"]; onDevice: (device: Device) => void; onNavigate: (key: NavKey) => void; onNewDevice: () => void; notify: (message: string) => void; canApprove: boolean; canCreate: boolean }) {
+  devices = currentDevices;
   if (active === "dashboard") return <Dashboard devices={currentDevices} metrics={metrics} onDevice={onDevice} onNavigate={onNavigate} onNewDevice={onNewDevice} canCreate={canCreate} />;
   if (active === "versions") return <VersionCenter devices={currentDevices} onDevice={onDevice} notify={notify} />;
   if (active === "changes") return <ChangeOrderCenter devices={currentDevices} notify={notify} canApprove={canApprove} />;
