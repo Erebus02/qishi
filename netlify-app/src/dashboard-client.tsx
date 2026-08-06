@@ -60,6 +60,13 @@ type ChangeOrder = {
   priority: string; planned_at: string | null; status: string; applicant_name: string; reviewer_name: string | null;
   device_count: number; devices: string; created_at: string;
 };
+type ApiRequest = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+type ApprovalRecord = {
+  id: string; device_id: string; version_no: string; title: string; summary: string; status: string;
+  owner_user_id: string | null; owner_name: string | null; device_code: string; device_name: string;
+  image: string | null; project_name: string; review_action: string | null; review_detail: string | null;
+  reviewer_id: string | null; reviewer_name: string | null; reviewed_at: string | null; created_at: string;
+};
 
 const navItems = [
   { key: "dashboard" as const, label: "工作台", icon: LayoutDashboard },
@@ -102,8 +109,15 @@ export default function DashboardClient({ initialData }: { initialData: Bootstra
   const [showNewDevice, setShowNewDevice] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [toast, setToast] = useState("");
-  const user = initialData.user;
+  const [user, setUser] = useState(initialData.user);
+  const [users, setUsers] = useState(initialData.users);
+  const [profileOpen, setProfileOpen] = useState(false);
   const can = (permission: string) => user.permissions.includes(permission);
+  const apiFetch: ApiRequest = (input, init = {}) => {
+    const headers = new Headers(init.headers);
+    headers.set("X-ModelFlow-User-Id", user.id);
+    return fetch(input, { ...init, headers });
+  };
 
   const filtered = useMemo(() => {
     return devices.filter((device) => {
@@ -122,16 +136,18 @@ export default function DashboardClient({ initialData }: { initialData: Bootstra
   };
 
   const refreshData = async () => {
-    const response = await fetch("/api/bootstrap", { cache: "no-store" });
+    const response = await apiFetch("/api/bootstrap", { cache: "no-store" });
     if (!response.ok) return notify("刷新失败，请稍后重试");
     const data = await response.json() as BootstrapData;
     setDevices(data.devices);
     setMetrics(data.metrics);
+    setUser(data.user);
+    setUsers(data.users);
     notify("数据已从数据库刷新");
   };
 
   const createDevice = async (payload: NewDevicePayload) => {
-    const response = await fetch("/api/devices", {
+    const response = await apiFetch("/api/devices", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -142,7 +158,7 @@ export default function DashboardClient({ initialData }: { initialData: Bootstra
   };
 
   const createVersion = async (device: Device, payload: NewVersionPayload) => {
-    const response = await fetch(`/api/devices/${device.id}/versions`, {
+    const response = await apiFetch(`/api/devices/${device.id}/versions`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -153,7 +169,7 @@ export default function DashboardClient({ initialData }: { initialData: Bootstra
   };
 
   const updateDevice = async (device: Device, payload: { name: string; category: string; lifecycleStatus: string; description: string }) => {
-    const response = await fetch(`/api/devices/${device.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...payload, rowVersion: device.rowVersion }) });
+    const response = await apiFetch(`/api/devices/${device.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...payload, rowVersion: device.rowVersion }) });
     const result = await response.json() as { error?: string };
     if (!response.ok) throw new Error(result.error || "更新设备失败");
     setSelected(null); setEditingDevice(null); await refreshData();
@@ -161,10 +177,32 @@ export default function DashboardClient({ initialData }: { initialData: Bootstra
 
   const deleteDevice = async (device: Device) => {
     if (!window.confirm(`确定删除“${device.name}”吗？设备将从列表隐藏，审计记录仍会保留。`)) return;
-    const response = await fetch(`/api/devices/${device.id}`, { method: "DELETE" });
+    const response = await apiFetch(`/api/devices/${device.id}`, { method: "DELETE" });
     if (!response.ok) { const result = await response.json() as { error?: string }; return notify(result.error || "删除设备失败"); }
     setSelected(null); notify(`${device.name} 已删除`); await refreshData();
   };
+
+  const switchUser = async (nextUserId: string) => {
+    const response = await fetch("/api/bootstrap", { cache: "no-store", headers: { "X-ModelFlow-User-Id": nextUserId } });
+    const data = await response.json() as BootstrapData & { error?: string };
+    if (!response.ok) return notify(data.error || "切换人员失败");
+    setUser(data.user); setUsers(data.users); setDevices(data.devices); setMetrics(data.metrics);
+    window.localStorage.setItem("modelflow-active-user", data.user.id);
+    setProfileOpen(false); setSelected(null); setEditingDevice(null); setNewVersionFor(null);
+    if ((activeNav === "permissions" && !data.user.permissions.includes("role.manage")) ||
+        (activeNav === "approvals" && !data.user.permissions.includes("version.approve")) ||
+        (activeNav === "changes" && !data.user.permissions.includes("change.read")) ||
+        (activeNav === "logs" && !data.user.permissions.includes("audit.read"))) setActiveNav("dashboard");
+    notify(`已切换为 ${data.user.displayName} · ${data.user.roleName}`);
+  };
+
+  useEffect(() => {
+    const savedUserId = window.localStorage.getItem("modelflow-active-user");
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (savedUserId && savedUserId !== initialData.user.id) void switchUser(savedUserId);
+    // This one-time session restore intentionally runs after hydration.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const titleMap: Record<NavKey, { title: string; subtitle: string }> = {
     dashboard: { title: "工作台", subtitle: "掌握设备、版本与审批任务的最新动态" },
@@ -194,7 +232,7 @@ export default function DashboardClient({ initialData }: { initialData: Bootstra
         </div>
 
         <nav className="main-nav" aria-label="主要导航">
-          {navItems.filter((item) => (item.key !== "permissions" || can("role.manage")) && (item.key !== "changes" || can("change.read"))).map((item) => {
+          {navItems.filter((item) => (item.key !== "permissions" || can("role.manage")) && (item.key !== "changes" || can("change.read")) && (item.key !== "approvals" || can("version.approve")) && (item.key !== "logs" || can("audit.read"))).map((item) => {
             const Icon = item.icon;
             return (
               <button
@@ -205,7 +243,7 @@ export default function DashboardClient({ initialData }: { initialData: Bootstra
               >
                 <Icon size={20} strokeWidth={1.8} />
                 {!collapsed && <span>{item.label}</span>}
-                {!collapsed && item.badge && <b>{item.badge}</b>}
+                {!collapsed && item.key === "approvals" && metrics.pendingApproval > 0 && <b>{metrics.pendingApproval}</b>}
               </button>
             );
           })}
@@ -225,9 +263,9 @@ export default function DashboardClient({ initialData }: { initialData: Bootstra
             {can("device.create") && <button className="primary-button" onClick={() => setShowNewDevice(true)}>
               <Plus size={18} /> 新建设备 <ChevronDown size={15} />
             </button>}
-            <button className="text-button" onClick={() => setActiveNav("models")}><Upload size={18} /> 导入</button>
+            {can("file.upload") && <button className="text-button" onClick={() => setActiveNav("models")}><Upload size={18} /> 导入</button>}
             <button className="text-button" onClick={() => exportDevices(devices)}><Download size={18} /> 导出</button>
-            <button className="text-button" onClick={() => notify("请在设备列表的操作栏选择编辑、创建版本或删除")}><Grid2X2 size={17} /> 批量操作 <ChevronDown size={14} /></button>
+            {(can("device.update") || can("version.create") || can("device.delete")) && <button className="text-button" onClick={() => notify("请在设备列表的操作栏选择编辑、创建版本或删除")}><Grid2X2 size={17} /> 批量操作 <ChevronDown size={14} /></button>}
             <button className="text-button" onClick={refreshData}><RefreshCw size={17} /> 刷新</button>
           </div>
           <div className="top-right">
@@ -235,10 +273,16 @@ export default function DashboardClient({ initialData }: { initialData: Bootstra
               <Search size={17} />
               <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="搜索设备名称、编码、版本号" />
             </label>
-            <button className="icon-button notification" aria-label="通知" onClick={() => notify("当前有 8 条待处理提醒，请前往审批中心查看")}><Bell size={19} /><i>8</i></button>
-            <button className="profile-button" title={user.email} onClick={() => notify(`${user.displayName} · ${user.roleName}`)}>
+            <button className="icon-button notification" aria-label="通知" onClick={() => { if (can("version.approve")) setActiveNav("approvals"); notify(can("version.approve") && metrics.pendingApproval ? `当前有 ${metrics.pendingApproval} 项版本等待审批` : "当前没有你可处理的审批任务"); }}><Bell size={19} />{can("version.approve") && metrics.pendingApproval > 0 && <i>{metrics.pendingApproval}</i>}</button>
+            <button className="profile-button" title={user.email} aria-expanded={profileOpen} onClick={() => setProfileOpen((open) => !open)}>
               <span>{user.displayName}</span><small>{user.roleName}</small><ChevronDown size={14} />
             </button>
+            {profileOpen && <div className="profile-menu" role="menu" aria-label="切换登录人员">
+              <header><b>切换登录人员</b><small>用于验证不同角色权限</small></header>
+              {users.map((candidate) => <button role="menuitem" className={candidate.id === user.id ? "active" : ""} key={candidate.id} onClick={() => void switchUser(candidate.id)}>
+                <span><b>{candidate.displayName}</b><small>{candidate.email}</small></span><em>{candidate.roleName}</em>{candidate.id === user.id && <Check size={15}/>}
+              </button>)}
+            </div>}
           </div>
         </header>
 
@@ -275,16 +319,17 @@ export default function DashboardClient({ initialData }: { initialData: Bootstra
               onDelete={(device) => void deleteDevice(device)}
               canEdit={can("device.update")}
               canDelete={can("device.delete")}
+              canCreateVersion={can("version.create")}
               notify={notify}
               metrics={metrics}
             />
           ) : (
-            <SectionView active={activeNav} devices={devices} metrics={metrics} onDevice={(device) => setSelected(device)} onNavigate={setActiveNav} onNewDevice={() => setShowNewDevice(true)} notify={notify} onRefresh={refreshData} canApprove={can("change.approve")} canCreate={can("device.create")} />
+            <SectionView active={activeNav} devices={devices} metrics={metrics} user={user} request={apiFetch} onDevice={(device) => setSelected(device)} onNavigate={setActiveNav} onNewDevice={() => setShowNewDevice(true)} notify={notify} onRefresh={refreshData} canApprove={can("change.approve")} canCreate={can("device.create")} />
           )}
         </div>
       </section>
 
-      {selected && <DeviceDetail device={selected} onClose={() => setSelected(null)} onNewVersion={() => setNewVersionFor(selected)} onEdit={() => setEditingDevice(selected)} onDelete={() => void deleteDevice(selected)} canEdit={can("device.update")} canDelete={can("device.delete")} />}
+      {selected && <DeviceDetail device={selected} onClose={() => setSelected(null)} onNewVersion={() => setNewVersionFor(selected)} onEdit={() => setEditingDevice(selected)} onDelete={() => void deleteDevice(selected)} canCreateVersion={can("version.create")} canEdit={can("device.update")} canDelete={can("device.delete")} />}
       {newVersionFor && <NewVersionModal device={newVersionFor} onClose={() => setNewVersionFor(null)} onSave={async (payload) => { try { await createVersion(newVersionFor, payload); setNewVersionFor(null); notify(`${newVersionFor.name} 的新版本草稿已写入数据库`); } catch (error) { notify(error instanceof Error ? error.message : "创建版本失败"); } }} />}
       {showNewDevice && <NewDeviceModal onClose={() => setShowNewDevice(false)} onSave={async (payload) => { try { await createDevice(payload); setShowNewDevice(false); notify("新设备已写入数据库"); } catch (error) { notify(error instanceof Error ? error.message : "创建设备失败"); } }} />}
       {editingDevice && <EditDeviceModal device={editingDevice} onClose={() => setEditingDevice(null)} onSave={async (payload) => { try { await updateDevice(editingDevice, payload); notify("设备资料已更新"); } catch (error) { notify(error instanceof Error ? error.message : "更新设备失败"); } }} />}
@@ -293,7 +338,7 @@ export default function DashboardClient({ initialData }: { initialData: Bootstra
   );
 }
 
-function DeviceManager({ devices, view, query, setQuery, onSelect, onNewVersion, onEdit, onDelete, canEdit, canDelete, notify, metrics }: {
+function DeviceManager({ devices, view, query, setQuery, onSelect, onNewVersion, onEdit, onDelete, canCreateVersion, canEdit, canDelete, notify, metrics }: {
   devices: Device[];
   view: "list" | "grid";
   query: string;
@@ -304,6 +349,7 @@ function DeviceManager({ devices, view, query, setQuery, onSelect, onNewVersion,
   onDelete: (device: Device) => void;
   canEdit: boolean;
   canDelete: boolean;
+  canCreateVersion: boolean;
   notify: (message: string) => void;
   metrics: BootstrapData["metrics"];
 }) {
@@ -345,7 +391,7 @@ function DeviceManager({ devices, view, query, setQuery, onSelect, onNewVersion,
                 <span className="file-count"><FileText size={15} /> {device.files}</span>
                 <div className="row-actions">
                   <button className="view-detail" onClick={() => onSelect(device)}>查看详情</button>
-                  <button className="icon-button" onClick={() => onNewVersion(device)} title="创建新版本"><Plus size={17} /></button>
+                  {canCreateVersion && <button className="icon-button" onClick={() => onNewVersion(device)} title="创建新版本"><Plus size={17} /></button>}
                   {canEdit && <button className="icon-button" aria-label={`编辑${device.name}`} title="编辑设备" onClick={() => onEdit(device)}><Pencil size={17} /></button>}
                   {canDelete && <button className="icon-button danger-button" aria-label={`删除${device.name}`} title="删除设备" onClick={() => onDelete(device)}><Trash2 size={17} /></button>}
                 </div>
@@ -361,7 +407,7 @@ function DeviceManager({ devices, view, query, setQuery, onSelect, onNewVersion,
                 <div className="card-title"><div><h3>{device.name}</h3><p>{device.code}</p></div>{canEdit && <button className="icon-button" aria-label={`编辑${device.name}`} onClick={() => onEdit(device)}><Pencil size={18} /></button>}</div>
                   <dl><div><dt>当前版本</dt><dd><b>{device.version}</b></dd></div><div><dt>负责人</dt><dd>{device.owner}</dd></div><div><dt>更新时间</dt><dd>{device.updated}</dd></div></dl>
                   <p className="card-change">{device.change}</p>
-                  <div className="card-actions"><button onClick={() => onSelect(device)}>查看详情</button>{canEdit && <button onClick={() => onEdit(device)}><Pencil size={15}/>编辑</button>}<button onClick={() => onNewVersion(device)}><Plus size={16} /> 新版本</button></div>
+                  <div className="card-actions"><button onClick={() => onSelect(device)}>查看详情</button>{canEdit && <button onClick={() => onEdit(device)}><Pencil size={15}/>编辑</button>}{canCreateVersion && <button onClick={() => onNewVersion(device)}><Plus size={16} /> 新版本</button>}</div>
                 </div>
               </article>
             ))}
@@ -377,7 +423,7 @@ function Metric({ icon, tone, label, value, trend, negative }: { icon: React.Rea
   return <article className="metric-card"><AppIcon>{<span className={`metric-icon ${tone}`}>{icon}</span>}</AppIcon><div><p>{label}</p><strong>{value}</strong><small className={negative ? "negative" : ""}>较上月 <b>{trend}</b></small></div></article>;
 }
 
-function DeviceDetail({ device, onClose, onNewVersion, onEdit, onDelete, canEdit, canDelete }: { device: Device; onClose: () => void; onNewVersion: () => void; onEdit: () => void; onDelete: () => void; canEdit: boolean; canDelete: boolean }) {
+function DeviceDetail({ device, onClose, onNewVersion, onEdit, onDelete, canCreateVersion, canEdit, canDelete }: { device: Device; onClose: () => void; onNewVersion: () => void; onEdit: () => void; onDelete: () => void; canCreateVersion: boolean; canEdit: boolean; canDelete: boolean }) {
   const [tab, setTab] = useState("概览");
   return (
     <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
@@ -392,7 +438,7 @@ function DeviceDetail({ device, onClose, onNewVersion, onEdit, onDelete, canEdit
               <div><dt>负责人</dt><dd>{device.owner}</dd></div><div><dt>更新时间</dt><dd>{device.updated}</dd></div>
               <div><dt>文件数量</dt><dd>{device.files} 个</dd></div><div><dt>BOM 版本</dt><dd>{device.bom}</dd></div>
             </dl>
-            <div className="summary-actions"><button className="primary-button" onClick={onNewVersion}><Plus size={17} /> 创建新版本</button>{canEdit && <button onClick={onEdit}><Pencil size={16} /> 编辑设备</button>}<button onClick={() => downloadText(`${device.code}-设备资料.json`, JSON.stringify(device, null, 2))}><Download size={16} /> 下载资料</button>{canDelete && <button className="delete-action" onClick={onDelete}><Trash2 size={16}/>删除设备</button>}</div>
+            <div className="summary-actions">{canCreateVersion && <button className="primary-button" onClick={onNewVersion}><Plus size={17} /> 创建新版本</button>}{canEdit && <button onClick={onEdit}><Pencil size={16} /> 编辑设备</button>}<button onClick={() => downloadText(`${device.code}-设备资料.json`, JSON.stringify(device, null, 2))}><Download size={16} /> 下载资料</button>{canDelete && <button className="delete-action" onClick={onDelete}><Trash2 size={16}/>删除设备</button>}</div>
           </div>
         </div>
         <div className="tabs">{["概览", "版本记录", "模型文件", "BOM", "审批记录", "操作日志"].map((item) => <button key={item} className={tab === item ? "active" : ""} onClick={() => setTab(item)}>{item}</button>)}</div>
@@ -468,24 +514,24 @@ function nextVersion(version: string) { const [major, minor] = version.replace("
 function downloadText(filename: string, content: string) { const url = URL.createObjectURL(new Blob([content], { type: "text/plain;charset=utf-8" })); const anchor = document.createElement("a"); anchor.href = url; anchor.download = filename; anchor.click(); window.setTimeout(() => URL.revokeObjectURL(url), 1000); }
 function exportDevices(rows: Device[]) { downloadText(`ModelFlow设备清单-${new Date().toISOString().slice(0, 10)}.csv`, "设备编号,设备名称,当前版本,状态,所属项目,负责人,更新时间\n" + rows.map((d) => [d.code,d.name,d.version,d.status,d.project,d.owner,d.updated].map((v) => `\"${String(v).replaceAll('"','""')}\"`).join(",")).join("\n")); }
 
-function SectionView({ active, devices: currentDevices, metrics, onDevice, onNavigate, onNewDevice, notify, onRefresh, canApprove, canCreate }: { active: NavKey; devices: Device[]; metrics: BootstrapData["metrics"]; onDevice: (device: Device) => void; onNavigate: (key: NavKey) => void; onNewDevice: () => void; notify: (message: string) => void; onRefresh: () => Promise<void>; canApprove: boolean; canCreate: boolean }) {
-  if (active === "dashboard") return <Dashboard devices={currentDevices} metrics={metrics} onDevice={onDevice} onNavigate={onNavigate} onNewDevice={onNewDevice} canCreate={canCreate} />;
-  if (active === "versions") return <VersionCenter devices={currentDevices} onDevice={onDevice} notify={notify} />;
-  if (active === "changes") return <ChangeOrderCenter devices={currentDevices} notify={notify} canApprove={canApprove} />;
+function SectionView({ active, devices: currentDevices, metrics, user, request, onDevice, onNavigate, onNewDevice, notify, onRefresh, canApprove, canCreate }: { active: NavKey; devices: Device[]; metrics: BootstrapData["metrics"]; user: BootstrapData["user"]; request: ApiRequest; onDevice: (device: Device) => void; onNavigate: (key: NavKey) => void; onNewDevice: () => void; notify: (message: string) => void; onRefresh: () => Promise<void>; canApprove: boolean; canCreate: boolean }) {
+  if (active === "dashboard") return <Dashboard devices={currentDevices} metrics={metrics} onDevice={onDevice} onNavigate={onNavigate} onNewDevice={onNewDevice} canCreate={canCreate} canUpload={user.permissions.includes("file.upload")} canChange={user.permissions.includes("change.create")} canApprove={user.permissions.includes("version.approve")} />;
+  if (active === "versions") return <VersionCenter devices={currentDevices} request={request} onRefresh={onRefresh} onDevice={onDevice} notify={notify} canSubmit={user.permissions.includes("version.submit")} />;
+  if (active === "changes") return <ChangeOrderCenter devices={currentDevices} request={request} notify={notify} canApprove={canApprove} />;
   if (active === "permissions") return <PermissionCenter notify={notify} />;
-  if (active === "approvals") return <ApprovalCenter devices={currentDevices} notify={notify} onRefresh={onRefresh} />;
-  if (active === "models") return <ModelCenter notify={notify} />;
+  if (active === "approvals") return <ApprovalCenter user={user} request={request} notify={notify} onRefresh={onRefresh} />;
+  if (active === "models") return <ModelCenter notify={notify} canUpload={user.permissions.includes("file.upload")} />;
   if (active === "bom") return <BomCenter />;
   return <LogCenter notify={notify} />;
 }
 
-function ChangeOrderCenter({ devices, notify, canApprove }: { devices: Device[]; notify: (message: string) => void; canApprove: boolean }) {
+function ChangeOrderCenter({ devices, request, notify, canApprove }: { devices: Device[]; request: ApiRequest; notify: (message: string) => void; canApprove: boolean }) {
   const [orders, setOrders] = useState<ChangeOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const load = async () => {
     setLoading(true);
-    const response = await fetch("/api/change-orders", { cache: "no-store" });
+    const response = await request("/api/change-orders", { cache: "no-store" });
     const result = await response.json() as { changeOrders?: ChangeOrder[]; error?: string };
     setLoading(false);
     if (!response.ok) return notify(result.error || "变更单加载失败");
@@ -499,7 +545,7 @@ function ChangeOrderCenter({ devices, notify, canApprove }: { devices: Device[];
   const review = async (id: string, action: "approve" | "reject") => {
     const comment = action === "reject" ? window.prompt("请输入驳回原因") : "批准实施";
     if (action === "reject" && !comment) return;
-    const response = await fetch(`/api/change-orders/${id}/review`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, comment }) });
+    const response = await request(`/api/change-orders/${id}/review`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, comment }) });
     const result = await response.json() as { error?: string };
     if (!response.ok) return notify(result.error || "审批失败");
     notify(action === "approve" ? "变更申请已批准" : "变更申请已驳回");
@@ -521,11 +567,11 @@ function ChangeOrderCenter({ devices, notify, canApprove }: { devices: Device[];
         </article>)}
       </div>
     </section>
-    {showForm && <ChangeOrderModal devices={devices} onClose={() => setShowForm(false)} onSubmitted={async (message) => { setShowForm(false); notify(message); await load(); }} />}
+    {showForm && <ChangeOrderModal devices={devices} request={request} onClose={() => setShowForm(false)} onSubmitted={async (message) => { setShowForm(false); notify(message); await load(); }} />}
   </>;
 }
 
-function ChangeOrderModal({ devices, onClose, onSubmitted }: { devices: Device[]; onClose: () => void; onSubmitted: (message: string) => Promise<void> }) {
+function ChangeOrderModal({ devices, request, onClose, onSubmitted }: { devices: Device[]; request: ApiRequest; onClose: () => void; onSubmitted: (message: string) => Promise<void> }) {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const toggle = (id: string) => setSelectedIds((current) => current.includes(id) ? current.filter((x) => x !== id) : [...current, id]);
@@ -533,7 +579,7 @@ function ChangeOrderModal({ devices, onClose, onSubmitted }: { devices: Device[]
     event.preventDefault();
     if (!selectedIds.length) return window.alert("请至少选择一台设备");
     const form = new FormData(event.currentTarget); setSaving(true);
-    const response = await fetch("/api/change-orders", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ deviceIds: selectedIds, batchNo: form.get("batchNo"), title: form.get("title"), reason: form.get("reason"), priority: form.get("priority"), plannedAt: form.get("plannedAt"), description: form.get("description"), submit: true }) });
+    const response = await request("/api/change-orders", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ deviceIds: selectedIds, batchNo: form.get("batchNo"), title: form.get("title"), reason: form.get("reason"), priority: form.get("priority"), plannedAt: form.get("plannedAt"), description: form.get("description"), submit: true }) });
     const result = await response.json() as { orderNo?: string; error?: string }; setSaving(false);
     if (!response.ok) return window.alert(result.error || "提交失败");
     await onSubmitted(`变更申请 ${result.orderNo} 已提交审批`);
@@ -551,7 +597,7 @@ function ChangeOrderModal({ devices, onClose, onSubmitted }: { devices: Device[]
 
 function changeStatusLabel(status: string) { return ({ draft: "草稿", submitted: "待审批", approved: "已批准", rejected: "已驳回", implemented: "已实施" } as Record<string, string>)[status] || status; }
 
-function Dashboard({ devices, metrics, onDevice, onNavigate, onNewDevice, canCreate }: { devices: Device[]; metrics: BootstrapData["metrics"]; onDevice: (device: Device) => void; onNavigate: (key: NavKey) => void; onNewDevice: () => void; canCreate: boolean }) {
+function Dashboard({ devices, metrics, onDevice, onNavigate, onNewDevice, canCreate, canUpload, canChange, canApprove }: { devices: Device[]; metrics: BootstrapData["metrics"]; onDevice: (device: Device) => void; onNavigate: (key: NavKey) => void; onNewDevice: () => void; canCreate: boolean; canUpload: boolean; canChange: boolean; canApprove: boolean }) {
   const pending = devices.filter((device) => device.status !== "已发布");
   return <div className="user-dashboard">
     <section className="welcome-panel">
@@ -562,9 +608,9 @@ function Dashboard({ devices, metrics, onDevice, onNavigate, onNewDevice, canCre
       <header><div><span>快捷开始</span><h3>你今天想完成什么？</h3></div><small>选择一个任务即可进入对应流程</small></header>
       <div>
         {canCreate && <button onClick={onNewDevice}><i className="quick-blue"><Plus /></i><span><b>新建设备</b><small>录入设备基础资料和负责人</small></span><ChevronRight /></button>}
-        <button onClick={() => onNavigate("models")}><i className="quick-teal"><Upload /></i><span><b>上传模型</b><small>添加 SolidWorks 模型或工程图</small></span><ChevronRight /></button>
-        <button onClick={() => onNavigate("changes")}><i className="quick-purple"><FilePenLine /></i><span><b>发起变更</b><small>选择设备并提交变更申请</small></span><ChevronRight /></button>
-        <button onClick={() => onNavigate("approvals")}><i className="quick-orange"><ClipboardCheck /></i><span><b>处理审批</b><small>{metrics.pendingApproval ? `${metrics.pendingApproval} 项等待处理` : "当前没有待审批任务"}</small></span><ChevronRight /></button>
+        {canUpload && <button onClick={() => onNavigate("models")}><i className="quick-teal"><Upload /></i><span><b>上传模型</b><small>添加 SolidWorks 模型或工程图</small></span><ChevronRight /></button>}
+        {canChange && <button onClick={() => onNavigate("changes")}><i className="quick-purple"><FilePenLine /></i><span><b>发起变更</b><small>选择设备并提交变更申请</small></span><ChevronRight /></button>}
+        {canApprove && <button onClick={() => onNavigate("approvals")}><i className="quick-orange"><ClipboardCheck /></i><span><b>处理审批</b><small>{metrics.pendingApproval ? `${metrics.pendingApproval} 项等待处理` : "当前没有待审批任务"}</small></span><ChevronRight /></button>}
       </div>
     </section>
     <section className="dashboard-card recent-work"><header><div><span>继续工作</span><h3>最近更新的设备</h3></div><button onClick={() => onNavigate("devices")}>查看全部 <ChevronRight size={15}/></button></header>{devices.slice(0,4).map(d => <button key={d.id} onClick={() => onDevice(d)}><img src={d.image} alt="" /><span><b>{d.name}</b><small>{d.change}</small></span><StatusTag status={d.status}/><em>{d.version}</em><ChevronRight /></button>)}</section>
@@ -572,31 +618,59 @@ function Dashboard({ devices, metrics, onDevice, onNavigate, onNewDevice, canCre
   </div>;
 }
 
-function VersionCenter({ devices, onDevice, notify }: { devices: Device[]; onDevice: (device: Device) => void; notify: (message: string) => void }) { return <section className="content-card"><div className="section-toolbar"><label><Search size={17}/><input placeholder="搜索设备或版本" /></label><button onClick={() => notify("可直接输入设备名称或版本号筛选，点击结果查看详情")}><Filter size={16}/>筛选说明</button></div><div className="simple-table version-table"><div><b>设备</b><b>版本</b><b>基准版本</b><b>状态</b><b>更新摘要</b><b>更新时间</b></div>{devices.map((d,i)=><button key={d.id} onClick={()=>onDevice(d)}><span><img src={d.image} alt=""/><strong>{d.name}</strong></span><b>{d.version}</b><span>{i===0?"V2.2":"上一版本"}</span><StatusTag status={d.status}/><span>{d.change}</span><span>{d.updated}</span></button>)}</div></section>; }
+function VersionCenter({ devices, request, onRefresh, onDevice, notify, canSubmit }: { devices: Device[]; request: ApiRequest; onRefresh: () => Promise<void>; onDevice: (device: Device) => void; notify: (message: string) => void; canSubmit: boolean }) {
+  const [submittingId, setSubmittingId] = useState<string | null>(null);
+  const submit = async (device: Device) => {
+    setSubmittingId(device.id);
+    const response = await request(`/api/devices/${device.id}/versions/submit`, { method: "POST" });
+    const result = await response.json() as { error?: string };
+    setSubmittingId(null);
+    if (!response.ok) return notify(result.error || "提交审批失败");
+    notify(`${device.name} ${device.version} 已提交审批`); await onRefresh();
+  };
+  return <section className="content-card"><div className="section-toolbar"><label><Search size={17}/><input placeholder="搜索设备或版本" /></label><button onClick={() => notify("可直接输入设备名称或版本号筛选，点击设备名称查看详情")}><Filter size={16}/>筛选说明</button></div><div className="simple-table version-table"><div><b>设备</b><b>版本</b><b>状态</b><b>更新摘要</b><b>更新时间</b><b>操作</b></div>{devices.map((device)=><div className="version-row" key={device.id}><button className="version-device" onClick={()=>onDevice(device)}><img src={device.image} alt=""/><strong>{device.name}</strong></button><b>{device.version}</b><StatusTag status={device.status}/><span>{device.change}</span><span>{device.updated}</span><span>{canSubmit && device.status === "草稿" ? <button className="small-action" disabled={submittingId === device.id} onClick={() => void submit(device)}>{submittingId === device.id ? "提交中" : "提交审批"}</button> : "—"}</span></div>)}</div></section>;
+}
 
 function PermissionCenter({ notify }: { notify: (message: string) => void }) { const roles=["系统管理员","项目负责人","设计工程师","审核工程师","生产人员"]; const permissions=["查看授权设备","新增设备","编辑主数据","创建版本","审批版本","发布版本","下载源模型","删除设备"]; return <div className="permission-layout"><aside className="role-list"><header><h3>角色</h3><button onClick={() => notify("自定义角色将在下一阶段开放；当前可配置内置角色")}><Plus size={16}/></button></header>{roles.map((r,i)=><button className={i===2?"active":""} key={r} onClick={() => notify(`已选择角色：${r}`)}><span><UserCog size={17}/>{r}</span><small>{[2,4,12,3,28][i]} 人</small></button>)}</aside><section className="permission-card"><header><div><h3>设计工程师</h3><p>创建和维护负责范围内的设备及草稿版本</p></div><button className="primary-button" onClick={()=>notify("权限配置已保存")}>保存配置</button></header><div className="scope-row"><span>数据范围</span><select><option>参与的项目 + 负责的设备</option><option>所属组织</option><option>全部数据</option></select></div><div className="permission-matrix"><div><b>功能权限</b><b>允许</b><b>仅负责范围</b></div>{permissions.map((p,i)=><div key={p}><span>{p}</span><label><input type="checkbox" defaultChecked={i<7}/><i></i></label><label><input type="checkbox" defaultChecked={i===2||i===3||i===6}/><i></i></label></div>)}</div></section></div>; }
 
-function ApprovalCenter({ devices, notify, onRefresh }: { devices: Device[]; notify: (message: string) => void; onRefresh: () => Promise<void> }) {
+function ApprovalCenter({ user, request, notify, onRefresh }: { user: BootstrapData["user"]; request: ApiRequest; notify: (message: string) => void; onRefresh: () => Promise<void> }) {
+  const [tab, setTab] = useState<"pending" | "reviewed" | "all">("pending");
+  const [records, setRecords] = useState<ApprovalRecord[]>([]);
+  const [loading, setLoading] = useState(true);
   const [pendingId, setPendingId] = useState<string | null>(null);
-  const review = async (device: Device, action: "approve" | "reject") => {
+  const load = async () => {
+    setLoading(true);
+    const response = await request("/api/approvals", { cache: "no-store" });
+    const result = await response.json() as { approvals?: ApprovalRecord[]; error?: string };
+    setLoading(false);
+    if (!response.ok) return notify(result.error || "审批记录加载失败");
+    setRecords(result.approvals || []);
+  };
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void load();
+  }, [user.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  const review = async (record: ApprovalRecord, action: "approve" | "reject") => {
     const comment = action === "reject" ? window.prompt("请输入退回修改意见") : "审批通过";
     if (action === "reject" && !comment?.trim()) return;
-    setPendingId(device.id);
+    setPendingId(record.id);
     try {
-      const response = await fetch(`/api/devices/${device.id}/versions/review`, {
+      const response = await request(`/api/devices/${record.device_id}/versions/review`, {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, comment }),
       });
       const result = await response.json() as { error?: string };
       if (!response.ok) throw new Error(result.error || "版本审批失败");
-      notify(`${device.name} ${action === "approve" ? "已审批通过" : "已退回修改"}`);
-      await onRefresh();
+      notify(`${record.device_name} ${action === "approve" ? "已审批通过" : "已退回修改"}`);
+      await Promise.all([onRefresh(), load()]); setTab("reviewed");
     } catch (error) { notify(error instanceof Error ? error.message : "版本审批失败"); }
     finally { setPendingId(null); }
   };
-  const pending = devices.filter((device) => device.status !== "已发布");
-  return <section className="approval-board"><div className="approval-tabs"><button className="active" onClick={() => notify("正在显示待我审批")}>待我审批 <b>{pending.length}</b></button><button onClick={() => notify("已审批记录可在审计日志中查看")}>我已审批</button><button onClick={() => notify("全部流程已按当前状态展示")}>全部流程</button></div>{pending.length === 0 ? <div className="empty-state">当前没有待审批版本</div> : pending.map(device=><article key={device.id}><img src={device.image} alt=""/><div><span>{device.project}</span><h3>{device.name} <b>{device.version}</b></h3><p>{device.change}</p><small>提交人：{device.owner} · {device.updated}</small></div><div><button disabled={pendingId === device.id} onClick={()=>review(device,"reject")}>退回</button><button disabled={pendingId === device.id} className="primary-button" onClick={()=>review(device,"approve")}><Check size={16}/>{pendingId === device.id ? "处理中" : "批准"}</button></div></article>)}</section>;
+  const pending = records.filter((record) => record.status === "in_review" && record.owner_user_id !== user.id);
+  const reviewed = records.filter((record) => record.reviewer_id === user.id && !!record.review_action);
+  const visible = tab === "pending" ? pending : tab === "reviewed" ? reviewed : records;
+  return <section className="approval-board"><div className="approval-tabs"><button className={tab === "pending" ? "active" : ""} onClick={() => setTab("pending")}>待我审批 <b>{pending.length}</b></button><button className={tab === "reviewed" ? "active" : ""} onClick={() => setTab("reviewed")}>我已审批 <b className="reviewed-count">{reviewed.length}</b></button><button className={tab === "all" ? "active" : ""} onClick={() => setTab("all")}>全部流程</button></div>{loading ? <div className="empty-state">正在读取审批记录…</div> : visible.length === 0 ? <div className="empty-state">{tab === "pending" ? "当前没有需要你审批的版本" : tab === "reviewed" ? "你还没有审批记录" : "暂无版本流程记录"}</div> : visible.map(record=><article key={`${record.id}-${record.reviewed_at || record.status}`}><img src={record.image || "/devices/powder-transfer-machine.png"} alt=""/><div><span>{record.project_name} · {record.device_code}</span><h3>{record.device_name} <b>{record.version_no}</b></h3><p>{record.summary}</p><small>提交人：{record.owner_name || "未分配"}{record.reviewer_name ? ` · 审批人：${record.reviewer_name}` : ""}{record.review_action ? ` · ${record.review_action === "version.approve" ? "已批准" : "已退回"}` : ""}</small></div><div>{record.status === "in_review" && record.owner_user_id !== user.id ? <><button disabled={pendingId === record.id} onClick={()=>review(record,"reject")}>退回</button><button disabled={pendingId === record.id} className="primary-button" onClick={()=>review(record,"approve")}><Check size={16}/>{pendingId === record.id ? "处理中" : "批准"}</button></> : <span className={`approval-result ${record.review_action === "version.reject" ? "rejected" : ""}`}>{record.review_action === "version.reject" ? "已退回" : record.review_action === "version.approve" ? "已批准" : record.status === "published" ? "已发布" : record.status === "draft" ? "草稿" : "审批中"}</span>}</div></article>)}</section>;
 }
 
-function ModelCenter({ notify }: { notify: (message: string) => void }) { return <section className="content-card"><input id="model-file-picker" type="file" hidden onChange={(event) => notify(event.target.files?.[0] ? `已选择：${event.target.files[0].name}` : "未选择文件")}/><div className="model-drop" onClick={()=>document.getElementById("model-file-picker")?.click()}><Upload size={28}/><div><b>上传 SolidWorks 模型</b><p>支持 SLDASM、SLDPRT、SLDDRW、STEP、DWG、PDF</p></div><button type="button" className="primary-button">选择文件</button></div><FileTable /></section>; }
+function ModelCenter({ notify, canUpload }: { notify: (message: string) => void; canUpload: boolean }) { return <section className="content-card">{canUpload && <><input id="model-file-picker" type="file" hidden onChange={(event) => notify(event.target.files?.[0] ? `已选择：${event.target.files[0].name}` : "未选择文件")}/><div className="model-drop" onClick={()=>document.getElementById("model-file-picker")?.click()}><Upload size={28}/><div><b>上传 SolidWorks 模型</b><p>支持 SLDASM、SLDPRT、SLDDRW、STEP、DWG、PDF</p></div><button type="button" className="primary-button">选择文件</button></div></>}<FileTable /></section>; }
 function BomCenter() { return <section className="content-card"><div className="bom-summary"><Metric icon={<PackageOpen/>} tone="blue" label="物料项" value="1,286" trend="↑ 3.2%"/><Metric icon={<Archive/>} tone="teal" label="标准件" value="548" trend="42.6%"/><Metric icon={<Zap/>} tone="orange" label="异常项" value="12" trend="待处理" negative/></div><BomTable /></section>; }
 function LogCenter({ notify }: { notify: (message: string) => void }) { return <section className="content-card log-page"><div className="section-toolbar"><label><Search size={17}/><input placeholder="搜索用户、设备或操作"/></label><button onClick={() => notify("请输入用户、设备或操作关键词进行筛选")}><Filter size={16}/>筛选说明</button><button onClick={() => downloadText("ModelFlow操作日志.txt", "张工创建版本 V2.3\n系统完成模型重建检查\n周工批准结构审核\n张工发布版本 V2.3")}><Download size={16}/>导出日志</button></div><AuditList /><AuditList /></section>; }

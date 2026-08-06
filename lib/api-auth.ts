@@ -1,11 +1,16 @@
 import { getChatGPTUser } from "../app/chatgpt-auth";
-import { initializeAndGetUser, requirePermission } from "./server-data";
+import { headers } from "next/headers";
+import { getUserById, initializeAndGetUser } from "./server-data";
 
 export async function currentApiUser(permission?: string) {
   const auth = await getChatGPTUser();
   if (!auth) throw new ApiError(401, "UNAUTHENTICATED", "请先登录");
   try {
-    return permission ? await requirePermission(auth, permission) : await initializeAndGetUser(auth);
+    const authenticated = await initializeAndGetUser(auth);
+    const requestedUserId = (await headers()).get("x-modelflow-user-id");
+    const user = requestedUserId ? await getUserById(requestedUserId) : authenticated;
+    if (permission && !user.permissions.includes(permission)) throw new Error("FORBIDDEN");
+    return user;
   } catch (error) {
     if (error instanceof Error && error.message === "FORBIDDEN") throw new ApiError(403, "FORBIDDEN", "没有执行此操作的权限");
     if (error instanceof Error && error.message === "ACCOUNT_DISABLED") throw new ApiError(403, "ACCOUNT_DISABLED", "账号已停用");

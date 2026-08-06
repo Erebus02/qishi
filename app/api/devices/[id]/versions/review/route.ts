@@ -13,13 +13,14 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       throw new ApiError(400, "COMMENT_REQUIRED", "退回时必须填写意见");
     }
 
-    const device = await getRawDb().prepare(`SELECT d.id,d.current_version_id,v.status
+    const device = await getRawDb().prepare(`SELECT d.id,d.current_version_id,v.status,v.owner_user_id
       FROM devices d LEFT JOIN device_versions v ON v.id=d.current_version_id
-      WHERE d.id=? AND d.deleted_at IS NULL`).bind(deviceId).first<{ id: string; current_version_id: string | null; status: string | null }>();
+      WHERE d.id=? AND d.deleted_at IS NULL`).bind(deviceId).first<{ id: string; current_version_id: string | null; status: string | null; owner_user_id: string | null }>();
     if (!device?.current_version_id) throw new ApiError(404, "VERSION_NOT_FOUND", "设备当前版本不存在");
-    if (!device.status || !["draft", "in_review"].includes(device.status)) {
-      throw new ApiError(409, "INVALID_VERSION_STATUS", "只有草稿或审批中的版本可以审核");
+    if (device.status !== "in_review") {
+      throw new ApiError(409, "INVALID_VERSION_STATUS", "只有审批中的版本可以审核");
     }
+    if (device.owner_user_id === user.id) throw new ApiError(409, "SELF_REVIEW_NOT_ALLOWED", "提交人不能审批自己的版本");
 
     const status = payload.action === "approve" ? "published" : "draft";
     await getRawDb().prepare(`UPDATE device_versions SET status=?,released_at=CASE WHEN ?='published' THEN CURRENT_TIMESTAMP ELSE NULL END,

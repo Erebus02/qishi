@@ -35,6 +35,12 @@ export async function initializeAndGetUser(auth: ChatGPTUser): Promise<AppUser> 
     d1.prepare("INSERT OR IGNORE INTO roles (id,name,code,permissions,data_scope) VALUES (?,?,?,?,?)").bind("role_viewer", "生产只读", "viewer", JSON.stringify(VIEWER_PERMISSIONS), "published"),
   ]);
 
+  await d1.batch([
+    d1.prepare("INSERT OR IGNORE INTO users (id,email,display_name,role_id,status) VALUES (?,?,?,?, 'active')").bind("usr_demo_engineer", "engineer@modelflow.local", "刘工", "role_engineer"),
+    d1.prepare("INSERT OR IGNORE INTO users (id,email,display_name,role_id,status) VALUES (?,?,?,?, 'active')").bind("usr_demo_reviewer", "reviewer@modelflow.local", "王工", "role_reviewer"),
+    d1.prepare("INSERT OR IGNORE INTO users (id,email,display_name,role_id,status) VALUES (?,?,?,?, 'active')").bind("usr_demo_viewer", "production@modelflow.local", "生产查看员", "role_viewer"),
+  ]);
+
   let row = await d1.prepare(`SELECT u.id,u.email,u.display_name,u.status,r.code role_code,r.name role_name,r.permissions,r.data_scope
     FROM users u JOIN roles r ON r.id=u.role_id WHERE lower(u.email)=lower(?)`).bind(auth.email).first<Record<string, string>>();
 
@@ -138,8 +144,12 @@ export async function loadBootstrap(user: AppUser): Promise<BootstrapData> {
   const versionCounts = await d1.prepare(`SELECT COUNT(*) total,
     SUM(CASE WHEN status='published' THEN 1 ELSE 0 END) published,
     SUM(CASE WHEN status='in_review' THEN 1 ELSE 0 END) pending FROM device_versions`).first<Record<string, number>>();
+  const userRows = await d1.prepare(`SELECT u.id,u.email,u.display_name,r.code role_code,r.name role_name,r.permissions,r.data_scope
+    FROM users u JOIN roles r ON r.id=u.role_id WHERE u.status='active' ORDER BY
+    CASE r.code WHEN 'admin' THEN 1 WHEN 'engineer' THEN 2 WHEN 'reviewer' THEN 3 ELSE 4 END,u.created_at`).all<Record<string, string>>();
   return {
     user,
+    users: (userRows.results ?? []).map(toAppUser),
     devices: deviceRows,
     metrics: {
       devices: deviceRows.length,
@@ -148,6 +158,21 @@ export async function loadBootstrap(user: AppUser): Promise<BootstrapData> {
       pendingApproval: Number(versionCounts?.pending ?? 0),
     },
   };
+}
+
+function toAppUser(row: Record<string, string>): AppUser {
+  return {
+    id: row.id, email: row.email, displayName: row.display_name,
+    roleCode: row.role_code, roleName: row.role_name,
+    permissions: JSON.parse(row.permissions || "[]"), dataScope: row.data_scope,
+  };
+}
+
+export async function getUserById(userId: string): Promise<AppUser> {
+  const row = await db().prepare(`SELECT u.id,u.email,u.display_name,u.status,r.code role_code,r.name role_name,r.permissions,r.data_scope
+    FROM users u JOIN roles r ON r.id=u.role_id WHERE u.id=?`).bind(userId).first<Record<string, string>>();
+  if (!row || row.status !== "active") throw new Error("ACCOUNT_DISABLED");
+  return toAppUser(row);
 }
 
 export async function requirePermission(auth: ChatGPTUser, permission: string) {

@@ -29,6 +29,7 @@ export type DeviceRecord = {
 
 export type BootstrapData = {
   user: AppUser;
+  users: AppUser[];
   devices: DeviceRecord[];
   metrics: {
     devices: number;
