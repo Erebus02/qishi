@@ -41,7 +41,7 @@ export async function initializeAndGetUser(auth: ChatGPTUser): Promise<AppUser> 
   if (!row) {
     const count = await d1.prepare("SELECT COUNT(*) total FROM users").first<{ total: number }>();
     const userId = id("usr");
-    const roleId = Number(count?.total ?? 0) === 0 ? "role_admin" : "role_engineer";
+    const roleId = auth.email === "public-admin@modelflow.local" || Number(count?.total ?? 0) === 0 ? "role_admin" : "role_engineer";
     await d1.prepare("INSERT INTO users (id,email,display_name,role_id,last_login_at) VALUES (?,?,?,?,CURRENT_TIMESTAMP)")
       .bind(userId, auth.email.toLowerCase(), auth.displayName, roleId).run();
     row = await d1.prepare(`SELECT u.id,u.email,u.display_name,u.status,r.code role_code,r.name role_name,r.permissions,r.data_scope
