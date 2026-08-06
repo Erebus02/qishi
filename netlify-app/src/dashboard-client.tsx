@@ -75,7 +75,7 @@ const navItems = [
 
 const versions = [
   { version: "V2.3", status: "当前版本", date: "2026-07-20", owner: "张工", summary: "优化视觉定位与上位机联动", color: "green" },
-  { version: "V2.2", status: "已取代", date: "2026-06-18", owner: "张工", summary: "完善粉末转运异常报警逻辑", color: "gray" },
+  { version: "V2.2", status: "已取代", date: "2026-06-18", owner: "张工", summary: "完善正极材料投料异常报警逻辑", color: "gray" },
   { version: "V2.1", status: "已取代", date: "2026-05-09", owner: "李工", summary: "新增料仓称重与数据采集", color: "gray" },
   { version: "V2.0", status: "已取代", date: "2026-03-22", owner: "李工", summary: "二代结构升级与总装重构", color: "gray" },
 ];
@@ -94,6 +94,7 @@ export default function DashboardClient({ initialData }: { initialData: Bootstra
   const [activeNav, setActiveNav] = useState<NavKey>("dashboard");
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("全部状态");
+  const [category, setCategory] = useState("全部分类");
   const [view, setView] = useState<"list" | "grid">("list");
   const [selected, setSelected] = useState<Device | null>(null);
   const [newVersionFor, setNewVersionFor] = useState<Device | null>(null);
@@ -110,9 +111,10 @@ export default function DashboardClient({ initialData }: { initialData: Bootstra
         .toLowerCase()
         .includes(query.toLowerCase());
       const matchesStatus = status === "全部状态" || device.status === status;
-      return matchesQuery && matchesStatus;
+      const matchesCategory = category === "全部分类" || device.category === category;
+      return matchesQuery && matchesStatus && matchesCategory;
     });
-  }, [devices, query, status]);
+  }, [category, devices, query, status]);
 
   const notify = (message: string) => {
     setToast(message);
@@ -252,7 +254,7 @@ export default function DashboardClient({ initialData }: { initialData: Bootstra
                 <select value={status} onChange={(e) => setStatus(e.target.value)} aria-label="状态筛选">
                   <option>全部状态</option><option>已发布</option><option>审批中</option><option>草稿</option>
                 </select>
-                <select aria-label="分类筛选"><option>全部分类</option><option>热处理设备</option><option>包装检测设备</option></select>
+                <select value={category} onChange={(e) => setCategory(e.target.value)} aria-label="分类筛选"><option>全部分类</option><option>粉体输送设备</option><option>电芯材料设备</option><option>电芯检测设备</option><option>模组装配设备</option><option>PACK 装配设备</option></select>
                 <div className="view-switch">
                   <button className={view === "grid" ? "active" : ""} onClick={() => setView("grid")} aria-label="卡片视图"><Grid2X2 size={17} /></button>
                   <button className={view === "list" ? "active" : ""} onClick={() => setView("list")} aria-label="列表视图"><List size={18} /></button>
@@ -277,7 +279,7 @@ export default function DashboardClient({ initialData }: { initialData: Bootstra
               metrics={metrics}
             />
           ) : (
-            <SectionView active={activeNav} devices={devices} metrics={metrics} onDevice={(device) => setSelected(device)} onNavigate={setActiveNav} onNewDevice={() => setShowNewDevice(true)} notify={notify} canApprove={can("change.approve")} canCreate={can("device.create")} />
+            <SectionView active={activeNav} devices={devices} metrics={metrics} onDevice={(device) => setSelected(device)} onNavigate={setActiveNav} onNewDevice={() => setShowNewDevice(true)} notify={notify} onRefresh={refreshData} canApprove={can("change.approve")} canCreate={can("device.create")} />
           )}
         </div>
       </section>
@@ -420,12 +422,12 @@ function VersionTimeline({ compact = false }: { compact?: boolean }) {
 }
 
 function FileTable() {
-  const files = [["SFN-002_总装.SLDASM", "主装配体", "48.6 MB"], ["SFN-002_机架.SLDPRT", "零件", "12.4 MB"], ["SFN-002_总装图.SLDDRW", "工程图", "8.9 MB"], ["SFN-002_发布图纸.PDF", "发布资料", "5.2 MB"]];
+  const files = [["CELL-OCV-006_总装.SLDASM", "主装配体", "48.6 MB"], ["CELL-OCV-006_检测工位.SLDPRT", "零件", "12.4 MB"], ["CELL-OCV-006_总装图.SLDDRW", "工程图", "8.9 MB"], ["CELL-OCV-006_发布图纸.PDF", "发布资料", "5.2 MB"]];
   return <div className="simple-table"><div><b>文件名</b><b>类型</b><b>大小</b><b>状态</b><b>操作</b></div>{files.map((file) => <div key={file[0]}><span><FileCog size={17} />{file[0]}</span><span>{file[1]}</span><span>{file[2]}</span><span className="healthy">已同步</span><button title={`下载${file[0]}`} onClick={() => downloadText(file[0] + ".txt", `ModelFlow 文件记录\n文件：${file[0]}\n类型：${file[1]}\n大小：${file[2]}`)}><Download size={16} /></button></div>)}</div>;
 }
 
 function BomTable() {
-  const rows = [["SFN-201", "主机架焊接件", "焊接件", "1"], ["SFN-225", "料仓组件", "装配体", "2"], ["MISUMI-HFS8", "铝型材 40×40", "标准件", "18"], ["SMC-CDQ2", "薄型气缸", "外购件", "6"]];
+  const rows = [["CELL-201", "检测工位主机架", "焊接件", "1"], ["CELL-225", "电芯定位载具", "装配体", "12"], ["MISUMI-HFS8", "铝型材 40×40", "标准件", "18"], ["SMC-CDQ2", "薄型气缸", "外购件", "6"]];
   return <div className="simple-table bom-table"><div><b>物料编码</b><b>名称</b><b>分类</b><b>数量</b><b>版本变化</b></div>{rows.map((row, index) => <div key={row[0]}><span>{row[0]}</span><strong>{row[1]}</strong><span>{row[2]}</span><span>{row[3]}</span><span className={index === 1 ? "change-badge" : "muted"}>{index === 1 ? "+1" : "无变化"}</span></div>)}</div>;
 }
 
@@ -445,7 +447,7 @@ function NewDeviceModal({ onClose, onSave }: { onClose: () => void; onSave: (pay
     e.preventDefault();
     const form = new FormData(e.currentTarget);
     await onSave({ code: String(form.get("code")), name: String(form.get("name")), projectCode: String(form.get("projectCode")), category: String(form.get("category")), lifecycleStatus: String(form.get("lifecycleStatus")), description: String(form.get("description") || "") });
-  }}><header><div><p>DEVICE MASTER DATA</p><h2>新建设备</h2></div><button type="button" className="icon-button" aria-label="关闭新建设备窗口" onClick={onClose}><X /></button></header><div className="form-grid"><label>设备编号<input name="code" placeholder="例如 EQ-NEW-001" required /></label><label>设备名称<input name="name" placeholder="请输入设备名称" required /></label><label>所属项目<select name="projectCode"><option value="PRJ-SFN">厦门 SFN 自动化项目</option><option value="PRJ-HP">氢破炉节能改造</option><option value="PRJ-PACK">检包自动化升级</option></select></label><label>负责人<select><option>当前用户</option></select></label><label>设备分类<select name="category"><option>自动化设备</option><option>热处理设备</option><option>包装检测设备</option></select></label><label>生命周期状态<select name="lifecycleStatus"><option value="designing">设计中</option><option value="testing">测试中</option><option value="active">生产使用中</option></select></label><label className="full-field">设备说明<textarea name="description" placeholder="填写设备用途、关键能力与项目背景……" /></label></div><footer><button type="button" onClick={onClose}>取消</button><button type="submit" className="primary-button">保存设备</button></footer></form></div>;
+  }}><header><div><p>DEVICE MASTER DATA</p><h2>新建设备</h2></div><button type="button" className="icon-button" aria-label="关闭新建设备窗口" onClick={onClose}><X /></button></header><div className="form-grid"><label>设备编号<input name="code" placeholder="例如 EQ-CELL-001" required /></label><label>设备名称<input name="name" placeholder="例如 方形电芯激光焊接机" required /></label><label>所属项目<select name="projectCode"><option value="PRJ-MATERIAL">华东动力电池材料产线项目</option><option value="PRJ-CELL">方形电芯一期产线项目</option><option value="PRJ-PACK">动力电池模组 PACK 自动化项目</option><option value="PRJ-ESS">储能电池模组智能产线项目</option></select></label><label>负责人<select><option>当前用户</option></select></label><label>设备分类<select name="category"><option>粉体输送设备</option><option>电芯材料设备</option><option>电芯检测设备</option><option>模组装配设备</option><option>PACK 装配设备</option></select></label><label>生命周期状态<select name="lifecycleStatus"><option value="designing">设计中</option><option value="testing">测试中</option><option value="active">生产使用中</option></select></label><label className="full-field">设备说明<textarea name="description" placeholder="填写锂电工序、产能节拍、关键能力与项目背景……" /></label></div><footer><button type="button" onClick={onClose}>取消</button><button type="submit" className="primary-button">保存设备</button></footer></form></div>;
 }
 
 function EditDeviceModal({ device, onClose, onSave }: { device: Device; onClose: () => void; onSave: (payload: { name: string; category: string; lifecycleStatus: string; description: string }) => Promise<void> }) {
@@ -455,7 +457,7 @@ function EditDeviceModal({ device, onClose, onSave }: { device: Device; onClose:
     try { await onSave({ name: String(form.get("name")), category: String(form.get("category")), lifecycleStatus: String(form.get("lifecycleStatus")), description: String(form.get("description") || "") }); } finally { setSaving(false); }
   }}><header><div><p>DEVICE MASTER DATA · {device.code}</p><h2>编辑设备</h2></div><button type="button" className="icon-button" aria-label="关闭编辑窗口" onClick={onClose}><X/></button></header><div className="form-grid">
     <label>设备编号<input value={device.code} readOnly title="设备编号创建后不可修改"/></label><label>设备名称<input name="name" defaultValue={device.name} required/></label>
-    <label>设备分类<select name="category" defaultValue={device.category}><option>自动化设备</option><option>粉末处理设备</option><option>热处理设备</option><option>包装检测设备</option><option>装配设备</option></select></label>
+    <label>设备分类<select name="category" defaultValue={device.category}><option>粉体输送设备</option><option>电芯材料设备</option><option>电芯检测设备</option><option>模组装配设备</option><option>PACK 装配设备</option></select></label>
     <label>生命周期状态<select name="lifecycleStatus" defaultValue={device.lifecycleStatus}><option value="designing">设计中</option><option value="testing">测试中</option><option value="active">生产使用中</option><option value="retired">已停用</option></select></label>
     <label className="full-field">设备说明<textarea name="description" defaultValue={device.description} placeholder="填写设备用途、能力与项目背景"/></label>
   </div><footer><button type="button" onClick={onClose}>取消</button><button type="submit" className="primary-button" disabled={saving}>{saving ? "保存中…" : "保存修改"}</button></footer></form></div>;
@@ -466,15 +468,12 @@ function nextVersion(version: string) { const [major, minor] = version.replace("
 function downloadText(filename: string, content: string) { const url = URL.createObjectURL(new Blob([content], { type: "text/plain;charset=utf-8" })); const anchor = document.createElement("a"); anchor.href = url; anchor.download = filename; anchor.click(); window.setTimeout(() => URL.revokeObjectURL(url), 1000); }
 function exportDevices(rows: Device[]) { downloadText(`ModelFlow设备清单-${new Date().toISOString().slice(0, 10)}.csv`, "设备编号,设备名称,当前版本,状态,所属项目,负责人,更新时间\n" + rows.map((d) => [d.code,d.name,d.version,d.status,d.project,d.owner,d.updated].map((v) => `\"${String(v).replaceAll('"','""')}\"`).join(",")).join("\n")); }
 
-let devices: Device[] = [];
-
-function SectionView({ active, devices: currentDevices, metrics, onDevice, onNavigate, onNewDevice, notify, canApprove, canCreate }: { active: NavKey; devices: Device[]; metrics: BootstrapData["metrics"]; onDevice: (device: Device) => void; onNavigate: (key: NavKey) => void; onNewDevice: () => void; notify: (message: string) => void; canApprove: boolean; canCreate: boolean }) {
-  devices = currentDevices;
+function SectionView({ active, devices: currentDevices, metrics, onDevice, onNavigate, onNewDevice, notify, onRefresh, canApprove, canCreate }: { active: NavKey; devices: Device[]; metrics: BootstrapData["metrics"]; onDevice: (device: Device) => void; onNavigate: (key: NavKey) => void; onNewDevice: () => void; notify: (message: string) => void; onRefresh: () => Promise<void>; canApprove: boolean; canCreate: boolean }) {
   if (active === "dashboard") return <Dashboard devices={currentDevices} metrics={metrics} onDevice={onDevice} onNavigate={onNavigate} onNewDevice={onNewDevice} canCreate={canCreate} />;
   if (active === "versions") return <VersionCenter devices={currentDevices} onDevice={onDevice} notify={notify} />;
   if (active === "changes") return <ChangeOrderCenter devices={currentDevices} notify={notify} canApprove={canApprove} />;
   if (active === "permissions") return <PermissionCenter notify={notify} />;
-  if (active === "approvals") return <ApprovalCenter notify={notify} />;
+  if (active === "approvals") return <ApprovalCenter devices={currentDevices} notify={notify} onRefresh={onRefresh} />;
   if (active === "models") return <ModelCenter notify={notify} />;
   if (active === "bom") return <BomCenter />;
   return <LogCenter notify={notify} />;
@@ -577,7 +576,26 @@ function VersionCenter({ devices, onDevice, notify }: { devices: Device[]; onDev
 
 function PermissionCenter({ notify }: { notify: (message: string) => void }) { const roles=["系统管理员","项目负责人","设计工程师","审核工程师","生产人员"]; const permissions=["查看授权设备","新增设备","编辑主数据","创建版本","审批版本","发布版本","下载源模型","删除设备"]; return <div className="permission-layout"><aside className="role-list"><header><h3>角色</h3><button onClick={() => notify("自定义角色将在下一阶段开放；当前可配置内置角色")}><Plus size={16}/></button></header>{roles.map((r,i)=><button className={i===2?"active":""} key={r} onClick={() => notify(`已选择角色：${r}`)}><span><UserCog size={17}/>{r}</span><small>{[2,4,12,3,28][i]} 人</small></button>)}</aside><section className="permission-card"><header><div><h3>设计工程师</h3><p>创建和维护负责范围内的设备及草稿版本</p></div><button className="primary-button" onClick={()=>notify("权限配置已保存")}>保存配置</button></header><div className="scope-row"><span>数据范围</span><select><option>参与的项目 + 负责的设备</option><option>所属组织</option><option>全部数据</option></select></div><div className="permission-matrix"><div><b>功能权限</b><b>允许</b><b>仅负责范围</b></div>{permissions.map((p,i)=><div key={p}><span>{p}</span><label><input type="checkbox" defaultChecked={i<7}/><i></i></label><label><input type="checkbox" defaultChecked={i===2||i===3||i===6}/><i></i></label></div>)}</div></section></div>; }
 
-function ApprovalCenter({ notify }: { notify: (message: string) => void }) { return <section className="approval-board"><div className="approval-tabs"><button className="active" onClick={() => notify("正在显示待我审批")}>待我审批 <b>18</b></button><button onClick={() => notify("正在显示我已审批的记录")}>我已审批</button><button onClick={() => notify("正在显示全部流程")}>全部流程</button></div>{devices.filter(d=>d.status!=="已发布").map(d=><article key={d.id}><img src={d.image} alt=""/><div><span>{d.project}</span><h3>{d.name} <b>{d.version}</b></h3><p>{d.change}</p><small>提交人：{d.owner} · {d.updated}</small></div><div><button onClick={()=>notify(`${d.name} 已退回修改`)}>退回</button><button className="primary-button" onClick={()=>notify(`${d.name} 已审批通过`)}><Check size={16}/>批准</button></div></article>)}</section>; }
+function ApprovalCenter({ devices, notify, onRefresh }: { devices: Device[]; notify: (message: string) => void; onRefresh: () => Promise<void> }) {
+  const [pendingId, setPendingId] = useState<string | null>(null);
+  const review = async (device: Device, action: "approve" | "reject") => {
+    const comment = action === "reject" ? window.prompt("请输入退回修改意见") : "审批通过";
+    if (action === "reject" && !comment?.trim()) return;
+    setPendingId(device.id);
+    try {
+      const response = await fetch(`/api/devices/${device.id}/versions/review`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, comment }),
+      });
+      const result = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(result.error || "版本审批失败");
+      notify(`${device.name} ${action === "approve" ? "已审批通过" : "已退回修改"}`);
+      await onRefresh();
+    } catch (error) { notify(error instanceof Error ? error.message : "版本审批失败"); }
+    finally { setPendingId(null); }
+  };
+  const pending = devices.filter((device) => device.status !== "已发布");
+  return <section className="approval-board"><div className="approval-tabs"><button className="active" onClick={() => notify("正在显示待我审批")}>待我审批 <b>{pending.length}</b></button><button onClick={() => notify("已审批记录可在审计日志中查看")}>我已审批</button><button onClick={() => notify("全部流程已按当前状态展示")}>全部流程</button></div>{pending.length === 0 ? <div className="empty-state">当前没有待审批版本</div> : pending.map(device=><article key={device.id}><img src={device.image} alt=""/><div><span>{device.project}</span><h3>{device.name} <b>{device.version}</b></h3><p>{device.change}</p><small>提交人：{device.owner} · {device.updated}</small></div><div><button disabled={pendingId === device.id} onClick={()=>review(device,"reject")}>退回</button><button disabled={pendingId === device.id} className="primary-button" onClick={()=>review(device,"approve")}><Check size={16}/>{pendingId === device.id ? "处理中" : "批准"}</button></div></article>)}</section>;
+}
 
 function ModelCenter({ notify }: { notify: (message: string) => void }) { return <section className="content-card"><input id="model-file-picker" type="file" hidden onChange={(event) => notify(event.target.files?.[0] ? `已选择：${event.target.files[0].name}` : "未选择文件")}/><div className="model-drop" onClick={()=>document.getElementById("model-file-picker")?.click()}><Upload size={28}/><div><b>上传 SolidWorks 模型</b><p>支持 SLDASM、SLDPRT、SLDDRW、STEP、DWG、PDF</p></div><button type="button" className="primary-button">选择文件</button></div><FileTable /></section>; }
 function BomCenter() { return <section className="content-card"><div className="bom-summary"><Metric icon={<PackageOpen/>} tone="blue" label="物料项" value="1,286" trend="↑ 3.2%"/><Metric icon={<Archive/>} tone="teal" label="标准件" value="548" trend="42.6%"/><Metric icon={<Zap/>} tone="orange" label="异常项" value="12" trend="待处理" negative/></div><BomTable /></section>; }

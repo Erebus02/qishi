@@ -67,20 +67,36 @@ export async function initializeAndGetUser(auth: ChatGPTUser): Promise<AppUser> 
 async function seedBusinessData(ownerUserId: string) {
   const d1 = db();
   const existing = await d1.prepare("SELECT COUNT(*) total FROM projects").first<{ total: number }>();
-  if (Number(existing?.total ?? 0) > 0) return;
+  if (Number(existing?.total ?? 0) > 0) {
+    await d1.batch([
+      d1.prepare("UPDATE projects SET code=?,name=? WHERE id=?").bind("PRJ-MATERIAL", "华东动力电池材料产线项目", "prj_sfn"),
+      d1.prepare("UPDATE projects SET code=?,name=? WHERE id=?").bind("PRJ-CELL", "方形电芯一期产线项目", "prj_hp"),
+      d1.prepare("UPDATE projects SET code=?,name=? WHERE id=?").bind("PRJ-PACK", "动力电池模组 PACK 自动化项目", "prj_pack"),
+      d1.prepare("UPDATE projects SET code=?,name=? WHERE id=?").bind("PRJ-ESS", "储能电池模组智能产线项目", "prj_glue"),
+      d1.prepare("UPDATE devices SET code=?,name=?,category=?,description=? WHERE id=?").bind("EQ-MAT-002", "正极材料自动投料系统", "粉体输送设备", "用于正极材料密闭输送、计量投料与除尘联锁。", "dev_sfn"),
+      d1.prepare("UPDATE devices SET code=?,name=?,category=?,description=? WHERE id=?").bind("EQ-CELL-019", "方形电芯辊道窑上下料系统", "电芯材料设备", "用于电芯材料烧结工序的自动上下料、缓存与节拍联动。", "dev_hp"),
+      d1.prepare("UPDATE devices SET code=?,name=?,category=?,description=? WHERE id=?").bind("EQ-OCV-006", "方形电芯外观检测装盘机", "电芯检测设备", "集成尺寸、极柱、外观检测与合格电芯自动装盘。", "dev_pack"),
+      d1.prepare("UPDATE devices SET code=?,name=?,category=?,description=? WHERE id=?").bind("EQ-MOD-004", "电池模组自动堆叠装配线", "模组装配设备", "用于电芯扫码、清洗、堆叠、压装和模组装配。", "dev_glue"),
+      d1.prepare("UPDATE device_versions SET title=?,summary=? WHERE id=?").bind("正极材料自动投料系统 V2.3", "优化称重精度、除尘联锁与 MES 配方下发", "ver_sfn_23"),
+      d1.prepare("UPDATE device_versions SET title=?,summary=? WHERE id=?").bind("方形电芯辊道窑上下料系统 V1.6", "优化缓存节拍与窑炉上下料安全互锁", "ver_hp_16"),
+      d1.prepare("UPDATE device_versions SET title=?,summary=? WHERE id=?").bind("方形电芯外观检测装盘机 V3.1", "新增极柱缺陷检测并优化装盘节拍", "ver_pack_31"),
+      d1.prepare("UPDATE device_versions SET title=?,summary=? WHERE id=?").bind("电池模组自动堆叠装配线 V1.2", "调整电芯定位结构与堆叠压力参数", "ver_glue_12"),
+    ]);
+    return;
+  }
 
   await d1.batch([
-    d1.prepare("INSERT INTO projects (id,code,name,owner_user_id) VALUES (?,?,?,?)").bind("prj_sfn", "PRJ-SFN", "厦门 SFN 自动化项目", ownerUserId),
-    d1.prepare("INSERT INTO projects (id,code,name,owner_user_id) VALUES (?,?,?,?)").bind("prj_hp", "PRJ-HP", "氢破炉节能改造", ownerUserId),
-    d1.prepare("INSERT INTO projects (id,code,name,owner_user_id) VALUES (?,?,?,?)").bind("prj_pack", "PRJ-PACK", "检包自动化升级", ownerUserId),
-    d1.prepare("INSERT INTO projects (id,code,name,owner_user_id) VALUES (?,?,?,?)").bind("prj_glue", "PRJ-GLUE", "磁钢粘胶自动化", ownerUserId),
+    d1.prepare("INSERT INTO projects (id,code,name,owner_user_id) VALUES (?,?,?,?)").bind("prj_sfn", "PRJ-MATERIAL", "华东动力电池材料产线项目", ownerUserId),
+    d1.prepare("INSERT INTO projects (id,code,name,owner_user_id) VALUES (?,?,?,?)").bind("prj_hp", "PRJ-CELL", "方形电芯一期产线项目", ownerUserId),
+    d1.prepare("INSERT INTO projects (id,code,name,owner_user_id) VALUES (?,?,?,?)").bind("prj_pack", "PRJ-PACK", "动力电池模组 PACK 自动化项目", ownerUserId),
+    d1.prepare("INSERT INTO projects (id,code,name,owner_user_id) VALUES (?,?,?,?)").bind("prj_glue", "PRJ-ESS", "储能电池模组智能产线项目", ownerUserId),
   ]);
 
   const seeds = [
-    ["dev_sfn", "prj_sfn", "EQ-SFN-002", "粉末自动转运设备", "粉末处理设备", "ver_sfn_23", "/devices/powder-transfer-machine.png", 28, "BOM-2.3", "V2.3", "published", "优化视觉定位与上位机联动"],
-    ["dev_hp", "prj_hp", "EQ-HP-019", "氢破炉 19 号", "热处理设备", "ver_hp_16", "/devices/hydrogen-furnace.png", 34, "BOM-1.6", "V1.6", "published", "喷淋系统双管改单管，缩短冷却时间"],
-    ["dev_pack", "prj_pack", "EQ-PACK-006", "检包自动装盘机", "包装检测设备", "ver_pack_31", "/devices/inspection-tray-machine.png", 31, "BOM-3.1", "V3.1", "in_review", "优化装盘节拍与漏装检测"],
-    ["dev_glue", "prj_glue", "EQ-GLUE-004", "磁钢自动粘胶线", "装配设备", "ver_glue_12", "/devices/inspection-tray-machine.png", 19, "BOM-1.2", "V1.2", "draft", "调整机械手抓取结构与胶路参数"],
+    ["dev_sfn", "prj_sfn", "EQ-MAT-002", "正极材料自动投料系统", "粉体输送设备", "ver_sfn_23", "/devices/powder-transfer-machine.png", 28, "BOM-2.3", "V2.3", "published", "优化称重精度、除尘联锁与 MES 配方下发"],
+    ["dev_hp", "prj_hp", "EQ-CELL-019", "方形电芯辊道窑上下料系统", "电芯材料设备", "ver_hp_16", "/devices/hydrogen-furnace.png", 34, "BOM-1.6", "V1.6", "published", "优化缓存节拍与窑炉上下料安全互锁"],
+    ["dev_pack", "prj_pack", "EQ-OCV-006", "方形电芯外观检测装盘机", "电芯检测设备", "ver_pack_31", "/devices/inspection-tray-machine.png", 31, "BOM-3.1", "V3.1", "in_review", "新增极柱缺陷检测并优化装盘节拍"],
+    ["dev_glue", "prj_glue", "EQ-MOD-004", "电池模组自动堆叠装配线", "模组装配设备", "ver_glue_12", "/devices/inspection-tray-machine.png", 19, "BOM-1.2", "V1.2", "draft", "调整电芯定位结构与堆叠压力参数"],
   ] as const;
 
   for (const seed of seeds) {

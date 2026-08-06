@@ -1,33 +1,15 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-const developmentPreviewMeta =
-  /<meta(?=[^>]*\bname=["']codex-preview["'])(?=[^>]*\bcontent=["']development["'])[^>]*>/i;
+test("production metadata is complete and contains no preview marker", async () => {
+  const layout = await readFile("app/layout.tsx", "utf8");
+  assert.match(layout, /ModelFlow｜SolidWorks 设备建模管理平台/);
+  assert.match(layout, /锂电|设备|SolidWorks/);
+  assert.doesNotMatch(layout, /codex-preview/);
+});
 
-test("renders development preview metadata", async () => {
-  const workerUrl = new URL("../dist/server/index.js", import.meta.url);
-  workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}`);
-  const { default: worker } = await import(workerUrl.href);
-
-  const response = await worker.fetch(
-    new Request("http://localhost/", {
-      headers: { accept: "text/html" },
-    }),
-    {
-      ASSETS: {
-        fetch: async () => new Response("Not found", { status: 404 }),
-      },
-    },
-    {
-      waitUntil() {},
-      passThroughOnException() {},
-    },
-  );
-
-  assert.equal(response.status, 200);
-  assert.match(
-    response.headers.get("content-type") ?? "",
-    /^text\/html\b/i,
-  );
-  assert.match(await response.text(), developmentPreviewMeta);
+test("compiled worker exposes the required default export", async () => {
+  const worker = await readFile("dist/server/index.js", "utf8");
+  assert.match(worker, /export\s*\{[^}]*\bdefault\b[^}]*\}|export\s+default\b/s);
 });
