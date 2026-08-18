@@ -8,14 +8,16 @@ const ADMIN_PERMISSIONS = [
   "file.read", "file.upload", "file.download", "task.read", "task.create",
   "agent.manage", "role.manage", "audit.read",
   "change.read", "change.create", "change.submit", "change.approve",
+  "approval.read", "approval.forward", "approval.add_sign", "approval.delete", "approval.retrieve", "approval.cancel", "approval.complete",
 ];
 const ENGINEER_PERMISSIONS = [
   "device.read", "device.create", "device.update", "version.read", "version.create",
   "version.submit", "file.read", "file.upload", "file.download", "task.read", "task.create",
   "change.read", "change.create", "change.submit",
+  "approval.read", "approval.retrieve", "approval.cancel",
 ];
-const REVIEWER_PERMISSIONS = ["device.read", "version.read", "version.approve", "file.read", "file.download", "audit.read", "change.read", "change.approve"];
-const VIEWER_PERMISSIONS = ["device.read", "version.read", "file.read", "file.download"];
+const REVIEWER_PERMISSIONS = ["device.read", "version.read", "version.approve", "file.read", "file.download", "audit.read", "change.read", "change.approve", "approval.read", "approval.forward", "approval.add_sign", "approval.complete"];
+const VIEWER_PERMISSIONS = ["device.read", "version.read", "file.read", "file.download", "approval.read"];
 
 function id(prefix: string) {
   return `${prefix}_${crypto.randomUUID().replaceAll("-", "")}`;
@@ -33,6 +35,10 @@ export async function initializeAndGetUser(auth: ChatGPTUser): Promise<AppUser> 
     d1.prepare("INSERT OR IGNORE INTO roles (id,name,code,permissions,data_scope) VALUES (?,?,?,?,?)").bind("role_engineer", "设计工程师", "engineer", JSON.stringify(ENGINEER_PERMISSIONS), "project"),
     d1.prepare("INSERT OR IGNORE INTO roles (id,name,code,permissions,data_scope) VALUES (?,?,?,?,?)").bind("role_reviewer", "审核工程师", "reviewer", JSON.stringify(REVIEWER_PERMISSIONS), "project"),
     d1.prepare("INSERT OR IGNORE INTO roles (id,name,code,permissions,data_scope) VALUES (?,?,?,?,?)").bind("role_viewer", "生产只读", "viewer", JSON.stringify(VIEWER_PERMISSIONS), "published"),
+    d1.prepare("UPDATE roles SET permissions=? WHERE id='role_admin'").bind(JSON.stringify(ADMIN_PERMISSIONS)),
+    d1.prepare("UPDATE roles SET permissions=? WHERE id='role_engineer'").bind(JSON.stringify(ENGINEER_PERMISSIONS)),
+    d1.prepare("UPDATE roles SET permissions=? WHERE id='role_reviewer'").bind(JSON.stringify(REVIEWER_PERMISSIONS)),
+    d1.prepare("UPDATE roles SET permissions=? WHERE id='role_viewer'").bind(JSON.stringify(VIEWER_PERMISSIONS)),
   ]);
 
   await d1.batch([

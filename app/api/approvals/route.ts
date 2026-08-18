@@ -10,9 +10,9 @@ export async function GET() {
       FROM device_versions v JOIN devices d ON d.id=v.device_id JOIN projects p ON p.id=d.project_id
       LEFT JOIN users ou ON ou.id=v.owner_user_id
       LEFT JOIN audit_logs al ON al.id=(SELECT a.id FROM audit_logs a WHERE a.resource_type='device_version' AND a.resource_id=v.id
-        AND a.action IN ('version.approve','version.reject') ORDER BY a.created_at DESC LIMIT 1)
+        AND a.action IN ('version.approve','version.reject','approval.forward','approval.add_sign','approval.retrieve','approval.cancel','approval.complete') ORDER BY a.created_at DESC LIMIT 1)
       LEFT JOIN users ru ON ru.id=al.user_id
-      WHERE d.deleted_at IS NULL ORDER BY COALESCE(al.created_at,v.created_at) DESC`).all<Record<string, string | null>>();
+      WHERE d.deleted_at IS NULL AND v.status<>'deleted' ORDER BY COALESCE(al.created_at,v.created_at) DESC`).all<Record<string, string | null>>();
     return Response.json({ currentUserId: user.id, approvals: rows.results ?? [] });
   } catch (error) { return apiFailure(error); }
 }
