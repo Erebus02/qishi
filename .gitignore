@@ -46,3 +46,7 @@ next-env.d.ts
 
 # Local Netlify folder
 .netlify
+
+# .NET build output (windows-agent)
+/windows-agent/bin/
+/windows-agent/obj/
