@@ -71,8 +71,8 @@ Codex 必须实际操作并记录结果，不得仅检查源代码：
 把发布后的生产地址写入 Windows 环境变量：
 
 ```powershell
-$env:MODELFLOW_BASE_URL="https://发布后的生产地址"
-$env:MODELFLOW_AGENT_TOKEN="后台生成的执行端令牌"
+$env:SW_AGENT_SERVER="https://发布后的生产地址"
+$env:SW_AGENT_TOKEN="后台生成的执行端令牌"
 cd windows-agent
 dotnet run -c Release
 ```
