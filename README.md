@@ -24,8 +24,8 @@ ModelFlow 是一个已接入真实数据库、登录鉴权、RBAC 权限和 Soli
 
 ```powershell
 cd windows-agent
-$env:MODELFLOW_BASE_URL="https://你的站点地址"
-$env:MODELFLOW_AGENT_TOKEN="在平台执行端管理中生成的令牌"
+$env:SW_AGENT_SERVER="https://你的站点地址"
+$env:SW_AGENT_TOKEN="在平台执行端管理中生成的令牌"
 dotnet run -c Release
 ```
 
